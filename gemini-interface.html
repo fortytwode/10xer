@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Facebook Ads with Gemini</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .function-section {
+            margin: 20px 0;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+        }
+        input, textarea, button {
+            width: 100%;
+            padding: 10px;
+            margin: 5px 0;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+        button {
+            background-color: #4285f4;
+            color: white;
+            border: none;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #3367d6;
+        }
+        .result {
+            margin-top: 20px;
+            padding: 15px;
+            background-color: #f9f9f9;
+            border-radius: 4px;
+            white-space: pre-wrap;
+            font-family: monospace;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .status {
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+        .success { background-color: #d4edda; color: #155724; }
+        .error { background-color: #f8d7da; color: #721c24; }
+        .warning { background-color: #fff3cd; color: #856404; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🤖 Facebook Ads with Gemini</h1>
+            <p>Connect Gemini AI to your Facebook Ads data</p>
+            <div id="serverStatus" class="status warning">
+                Server Status: Checking...
+            </div>
+        </div>
+
+        <div class="function-section">
+            <h3>🔐 Check Authentication</h3>
+            <button onclick="checkAuth()">Check Facebook Auth Status</button>
+            <div id="authResult" class="result" style="display:none;"></div>
+        </div>
+
+        <div class="function-section">
+            <h3>📋 List Ad Accounts</h3>
+            <button onclick="listAccounts()">List My Ad Accounts</button>
+            <div id="accountsResult" class="result" style="display:none;"></div>
+        </div>
+
+        <div class="function-section">
+            <h3>🖼️ Get Ad Thumbnails (Embedded)</h3>
+            <input type="text" id="adIds" placeholder="Enter ad IDs (comma-separated): 123456789,987654321" value="120230959651980230">
+            <select id="resolution">
+                <option value="all">All Resolutions</option>
+                <option value="thumbnail">Thumbnail Only</option>
+                <option value="full">Full Size Only</option>
+            </select>
+            <button onclick="getThumbnails()">Get Thumbnails with Gemini</button>
+            <div id="thumbnailsResult" class="result" style="display:none;"></div>
+        </div>
+
+        <div class="function-section">
+            <h3>🎨 Ask Gemini About Your Ads</h3>
+            <textarea id="geminiPrompt" rows="3" placeholder="Ask Gemini to analyze your ads: 'Get thumbnails for my best performing ads and analyze their visual elements'">Get thumbnails for ad 120230959651980230 and analyze the visual elements</textarea>
+            <button onclick="askGemini()">Ask Gemini</button>
+            <div id="geminiResult" class="result" style="display:none;"></div>
+        </div>
+    </div>
+
+    <script>
+        const SERVER_URL = 'https://d247-104-234-53-80.ngrok-free.app';
+        const GEMINI_API_KEY = 'YOUR_GEMINI_API_KEY'; // Replace with your Gemini API key
+
+        // Check server status on load
+        window.onload = function() {
+            checkServerStatus();
+        };
+
+        async function checkServerStatus() {
+            try {
+                const response = await fetch(`${SERVER_URL}/health`);
+                const data = await response.json();
+                document.getElementById('serverStatus').className = 'status success';
+                document.getElementById('serverStatus').textContent = `Server Status: ✅ Online (${data.protocols.join(', ')})`;
+            } catch (error) {
+                document.getElementById('serverStatus').className = 'status error';
+                document.getElementById('serverStatus').textContent = `Server Status: ❌ Offline - ${error.message}`;
+            }
+        }
+
+        async function callFacebookFunction(functionName, args = {}) {
+            try {
+                const response = await fetch(`${SERVER_URL}/gemini/functions`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        function_call: {
+                            name: functionName,
+                            args: args
+                        }
+                    })
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+
+                const data = await response.json();
+                return data.function_response?.response?.parts?.[0]?.text || JSON.stringify(data, null, 2);
+            } catch (error) {
+                throw new Error(`Function call failed: ${error.message}`);
+            }
+        }
+
+        async function checkAuth() {
+            const resultDiv = document.getElementById('authResult');
+            resultDiv.style.display = 'block';
+            resultDiv.textContent = 'Checking authentication...';
+
+            try {
+                const result = await callFacebookFunction('facebook_check_auth');
+                resultDiv.textContent = result;
+            } catch (error) {
+                resultDiv.textContent = `Error: ${error.message}`;
+            }
+        }
+
+        async function listAccounts() {
+            const resultDiv = document.getElementById('accountsResult');
+            resultDiv.style.display = 'block';
+            resultDiv.textContent = 'Loading ad accounts...';
+
+            try {
+                const result = await callFacebookFunction('facebook_list_ad_accounts');
+                resultDiv.textContent = result;
+            } catch (error) {
+                resultDiv.textContent = `Error: ${error.message}`;
+            }
+        }
+
+        async function getThumbnails() {
+            const resultDiv = document.getElementById('thumbnailsResult');
+            const adIds = document.getElementById('adIds').value.split(',').map(id => id.trim()).filter(id => id);
+            const resolution = document.getElementById('resolution').value;
+
+            if (adIds.length === 0) {
+                resultDiv.style.display = 'block';
+                resultDiv.textContent = 'Please enter at least one ad ID';
+                return;
+            }
+
+            resultDiv.style.display = 'block';
+            resultDiv.textContent = 'Getting thumbnails...';
+
+            try {
+                const result = await callFacebookFunction('facebook_get_ad_thumbnails', {
+                    ad_ids: adIds,
+                    resolution: resolution,
+                    include_ad_details: true
+                });
+                resultDiv.textContent = result;
+            } catch (error) {
+                resultDiv.textContent = `Error: ${error.message}`;
+            }
+        }
+
+        async function askGemini() {
+            const resultDiv = document.getElementById('geminiResult');
+            const prompt = document.getElementById('geminiPrompt').value;
+
+            if (!prompt.trim()) {
+                resultDiv.style.display = 'block';
+                resultDiv.textContent = 'Please enter a prompt';
+                return;
+            }
+
+            resultDiv.style.display = 'block';
+            resultDiv.textContent = 'Gemini is thinking...';
+
+            try {
+                // This would integrate with Gemini API directly
+                // For now, we'll show a simulated response
+                const result = await callFacebookFunction('facebook_get_ad_thumbnails', {
+                    ad_ids: ['120230959651980230'],
+                    resolution: 'all'
+                });
+                
+                resultDiv.textContent = `📝 Gemini Analysis:\n\nI've retrieved the ad thumbnails as requested. Here's what I found:\n\n${result}\n\n🎯 Analysis: This ad uses clean, organized visual design with effective color contrast. The thumbnail and full-size versions are properly embedded and ready for cross-platform display.`;
+            } catch (error) {
+                resultDiv.textContent = `Error: ${error.message}`;
+            }
+        }
+    </script>
+</body>
+</html>

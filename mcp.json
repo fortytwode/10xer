@@ -1,0 +1,14 @@
+{
+  "mcpServers": {
+    "facebook-ads-mcp": {
+      "command": "node",
+      "args": ["src/index.js"],
+      "cwd": "./facebook-ads-mcp",
+      "env": {
+        "FACEBOOK_ACCESS_TOKEN": "your_token_here",
+        "FACEBOOK_API_VERSION": "v18.0",
+        "FACEBOOK_BASE_URL": "https://graph.facebook.com"
+      }
+    }
+  }
+}
