@@ -157,15 +157,23 @@ export class OAuthServer {
 
   buildAuthUrl(state) {
     const baseUrl = 'https://www.facebook.com/v23.0/dialog/oauth';
+    const redirectUri = process.env.FACEBOOK_REDIRECT_URI || 'http://localhost:3002/auth/callback';
+    
     const params = new URLSearchParams({
       client_id: process.env.FACEBOOK_APP_ID,
-      redirect_uri: process.env.FACEBOOK_REDIRECT_URI || 'http://localhost:3002/auth/callback',
+      redirect_uri: redirectUri,
       scope: 'ads_read,ads_management,business_management',
       response_type: 'code',
       state: state
     });
 
-    return `${baseUrl}?${params}`;
+    const fullUrl = `${baseUrl}?${params}`;
+    console.error('🔍 OAuth URL Configuration:');
+    console.error('   App ID:', process.env.FACEBOOK_APP_ID);
+    console.error('   Redirect URI:', redirectUri);
+    console.error('   Full OAuth URL:', fullUrl);
+    
+    return fullUrl;
   }
 
   async start(port = 3002) {

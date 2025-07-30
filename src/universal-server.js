@@ -19,7 +19,7 @@ import { getAccountDetails } from './tools/get-account-details.js';
 import { getAccountInsights } from './tools/get-account-insights.js';
 import { getAccountActivities } from './tools/get-account-activities.js';
 import { getAdCreatives } from './tools/get-ad-creatives.js';
-import { getAdThumbnailsEmbedded } from './tools/get-ad-thumbnails-embedded.js';
+// import { getAdThumbnailsEmbedded } from './tools/get-ad-thumbnails-embedded.js';
 import { facebookLogin } from './tools/facebook-login.js';
 import { facebookLogout } from './tools/facebook-logout.js';
 import { facebookCheckAuth } from './tools/facebook-check-auth.js';
@@ -172,7 +172,8 @@ class UniversalFacebookAdsServer {
         return await getAdCreatives(args);
 
       case 'facebook_get_ad_thumbnails':
-        return await getAdThumbnailsEmbedded(args);
+        // return await getAdThumbnailsEmbedded(args);
+        throw new Error('get_ad_thumbnails_embedded tool is temporarily disabled');
 
       case '_list_tools':
         return {
