@@ -106,7 +106,7 @@ export class OAuthServer {
     const params = new URLSearchParams({
       client_id: process.env.FACEBOOK_APP_ID,
       client_secret: process.env.FACEBOOK_APP_SECRET,
-      redirect_uri: process.env.FACEBOOK_REDIRECT_URI || 'http://localhost:3000/auth/callback',
+      redirect_uri: process.env.FACEBOOK_REDIRECT_URI || 'http://localhost:3002/auth/callback',
       code: code
     });
 
@@ -159,7 +159,7 @@ export class OAuthServer {
     const baseUrl = 'https://www.facebook.com/v23.0/dialog/oauth';
     const params = new URLSearchParams({
       client_id: process.env.FACEBOOK_APP_ID,
-      redirect_uri: process.env.FACEBOOK_REDIRECT_URI || 'http://localhost:3000/auth/callback',
+      redirect_uri: process.env.FACEBOOK_REDIRECT_URI || 'http://localhost:3002/auth/callback',
       scope: 'ads_read,ads_management,business_management',
       response_type: 'code',
       state: state
