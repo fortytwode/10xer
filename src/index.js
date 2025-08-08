@@ -22,6 +22,10 @@ import { TOOL_SCHEMAS } from './schemas/tool-schemas.js';
 // Load environment variables
 dotenv.config({ path: new URL('../.env', import.meta.url) });
 
+// CLI Token Support
+import { getFacebookTokenFromCLI } from './utils/cli-args.js';
+import { TokenStorage } from './auth/token-storage.js';
+
 class FacebookAdsMCPServer {
   constructor() {
     this.server = new Server({
@@ -34,6 +38,18 @@ class FacebookAdsMCPServer {
     });
 
     this.setupToolHandlers();
+
+    // ✅ Auto-store CLI token if present
+    const { token, expiresIn } = getFacebookTokenFromCLI();
+    if (token) {
+      TokenStorage.storeToken(token, expiresIn)
+        .then(() => {
+          console.error('✅ CLI Facebook token stored on startup');
+        })
+        .catch((err) => {
+          console.error('❌ Failed to store CLI token on startup:', err.message);
+        });
+    }
   }
 
   setupToolHandlers() {
@@ -120,7 +136,7 @@ class FacebookAdsMCPServer {
           case 'facebook_get_activities_by_adaccount':
             return await getAccountActivities(args);
 
-
+          // Log to stderr so it doesn't interfere with MCP protocol
           case 'facebook_get_ad_creatives':
             return await getAdCreatives(args);
 
@@ -137,8 +153,6 @@ class FacebookAdsMCPServer {
   async run() {
     const transport = new StdioServerTransport();
     await this.server.connect(transport);
-    
-    // Log to stderr so it doesn't interfere with MCP protocol
     console.error('Facebook Ads MCP server running on stdio');
   }
 }

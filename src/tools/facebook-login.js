@@ -1,59 +1,68 @@
 import { OAuthServer } from '../auth/oauth-server.js';
 import { TokenStorage } from '../auth/token-storage.js';
+import { getFacebookTokenFromCLI } from '../utils/cli-args.js';
 import { createErrorResponse } from '../utils/error-handler.js';
 
 let oauthServer = null;
 
 export async function facebookLogin(args) {
   try {
-    // Check if user is already authenticated
+    // 🔍 Step 1: Look for CLI-provided token
+    const { token: cliToken, expiresIn } = getFacebookTokenFromCLI();
+
+    if (cliToken) {
+      await TokenStorage.storeToken(cliToken, expiresIn);
+      return {
+        content: [
+          {
+            type: 'text',
+            text: '✅ Facebook token provided via CLI. You are now logged in.',
+          },
+        ],
+      };
+    }
+
+    // 🔐 Step 2: Check for existing valid stored token
     const hasToken = await TokenStorage.hasValidToken();
     if (hasToken) {
       return {
         content: [
           {
             type: 'text',
-            text: '✅ You are already logged in to Facebook! Use facebook_logout to disconnect and login with a different account.',
+            text: '✅ You are already logged in to Facebook. Use facebook_logout to disconnect and login with another account.',
           },
         ],
       };
     }
 
-    // Check if required environment variables are set
-    if (!process.env.FACEBOOK_APP_ID || !process.env.FACEBOOK_APP_SECRET) {
-      return {
-        content: [
-          {
-            type: 'text',
-            text: `❌ Facebook App credentials not configured. Please add the following to your environment:
+//     // ⚙️ Step 3: Ensure env vars are set
+//     if (!process.env.FACEBOOK_APP_ID || !process.env.FACEBOOK_APP_SECRET) {
+//       return {
+//         content: [
+//           {
+//             type: 'text',
+//             text: `❌ Facebook App credentials not configured. Please add these to your .env file:
 
-FACEBOOK_APP_ID=your_app_id_here
-FACEBOOK_APP_SECRET=your_app_secret_here
+// FACEBOOK_APP_ID=your_app_id_here
+// FACEBOOK_APP_SECRET=your_app_secret_here`,
+//           },
+//         ],
+//       };
+//     }
 
-To get these credentials:
-1. Go to https://developers.facebook.com/apps/
-2. Create a new app or use an existing one
-3. Go to App Settings > Basic
-4. Copy the App ID and App Secret`,
-          },
-        ],
-      };
-    }
-
-    // Start OAuth server if not already running
+    // 🚀 Step 4: Start OAuth server
     if (!oauthServer) {
       oauthServer = new OAuthServer();
       await oauthServer.start(3002);
     }
 
-    // Start the OAuth flow immediately
     await oauthServer.startOAuthFlow();
 
     return {
       content: [
         {
           type: 'text',
-          text: '✅ Successfully logged in to Facebook!\n\nYou can now use Facebook Ads tools to:\n• List your ad accounts\n• Get account details and insights\n• View campaign performance\n• Access account activities',
+          text: '✅ Successfully logged in to Facebook using OAuth!\nYou can now access ad accounts and insights.',
         },
       ],
     };
@@ -62,4 +71,3 @@ To get these credentials:
     return createErrorResponse(error);
   }
 }
-
