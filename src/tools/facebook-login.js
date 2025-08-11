@@ -56,7 +56,24 @@ export async function facebookLogin(args) {
       await oauthServer.start(3002);
     }
 
-    await oauthServer.startOAuthFlow();
+    // Use relay OAuth if configured, otherwise use direct OAuth
+    try {
+      if (process.env.OAUTH_RELAY_URL) {
+        console.error('🔗 Using OAuth relay service:', process.env.OAUTH_RELAY_URL);
+        await oauthServer.startRelayOAuthFlow();
+      } else {
+        console.error('🔄 Using direct OAuth flow');
+        await oauthServer.startOAuthFlow();
+      }
+    } catch (error) {
+      // Fallback to direct OAuth if relay fails
+      if (process.env.OAUTH_RELAY_URL) {
+        console.error('⚠️ Relay OAuth failed, falling back to direct OAuth:', error.message);
+        await oauthServer.startOAuthFlow();
+      } else {
+        throw error;
+      }
+    }
 
     return {
       content: [

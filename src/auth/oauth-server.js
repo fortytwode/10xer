@@ -8,13 +8,14 @@ export class OAuthServer {
     this.app = express();
     this.server = null;
     this.pendingAuth = new Map(); // state -> resolve function
+    this.port = 3002; // Default port
     this.setupRoutes();
   }
 
   setupRoutes() {
     // OAuth callback endpoint
     this.app.get('/auth/callback', async (req, res) => {
-      const { code, state, error } = req.query;
+      const { code, state, error, token, expires_in } = req.query;
 
       if (error) {
         console.error('❌ Facebook OAuth error:', error);
@@ -36,13 +37,13 @@ export class OAuthServer {
         return;
       }
 
-      if (!code || !state) {
-        console.error('❌ Missing code or state in OAuth callback');
+      if (!state) {
+        console.error('❌ Missing state in OAuth callback');
         res.send(`
           <html>
             <body style="font-family: Arial, sans-serif; text-align: center; padding: 50px;">
               <h2 style="color: #e74c3c;">❌ Authentication Failed</h2>
-              <p>Missing authorization code or state parameter.</p>
+              <p>Missing state parameter.</p>
               <p>You can close this window and try again.</p>
             </body>
           </html>
@@ -51,11 +52,26 @@ export class OAuthServer {
       }
 
       try {
-        // Exchange code for access token
-        const tokenResponse = await this.exchangeCodeForToken(code);
+        let accessToken;
+        let tokenExpiresIn;
+
+        if (token) {
+          // Token provided by relay service
+          console.error('✅ Received token from relay service');
+          accessToken = token;
+          tokenExpiresIn = expires_in ? parseInt(expires_in) : null;
+        } else if (code) {
+          // Traditional OAuth flow (development mode)
+          console.error('🔄 Exchanging code for token...');
+          const tokenResponse = await this.exchangeCodeForToken(code);
+          accessToken = tokenResponse.access_token;
+          tokenExpiresIn = tokenResponse.expires_in;
+        } else {
+          throw new Error('No token or code provided');
+        }
         
         // Store token securely
-        await TokenStorage.storeToken(tokenResponse.access_token, tokenResponse.expires_in);
+        await TokenStorage.storeToken(accessToken, tokenExpiresIn);
         
         res.send(`
           <html>
@@ -63,6 +79,7 @@ export class OAuthServer {
               <h2 style="color: #27ae60;">✅ Successfully Connected to Facebook!</h2>
               <p>Your Facebook account has been linked successfully.</p>
               <p>You can now close this window and return to Claude.</p>
+              <script>setTimeout(() => window.close(), 2000);</script>
             </body>
           </html>
         `);
@@ -155,6 +172,36 @@ export class OAuthServer {
     });
   }
 
+  async startRelayOAuthFlow() {
+    return new Promise((resolve, reject) => {
+      // Generate state parameter for security
+      const state = uuidv4();
+      
+      // Store the resolver for this auth attempt
+      this.pendingAuth.set(state, { resolve, reject });
+
+      // Build relay OAuth URL
+      const relayUrl = `${process.env.OAUTH_RELAY_URL}/auth/start?state=${state}&port=${this.port}`;
+      
+      console.error('🌐 Opening relay OAuth in browser...');
+      console.error(`🔗 Relay URL: ${relayUrl}`);
+      
+      // Open browser to relay service
+      open(relayUrl).catch(error => {
+        console.error('❌ Failed to open browser:', error.message);
+        console.error(`🔗 Please manually visit: ${relayUrl}`);
+      });
+
+      // Set timeout for auth attempt (5 minutes)
+      setTimeout(() => {
+        if (this.pendingAuth.has(state)) {
+          this.pendingAuth.delete(state);
+          reject(new Error('OAuth timeout: User did not complete authentication within 5 minutes'));
+        }
+      }, 5 * 60 * 1000);
+    });
+  }
+
   buildAuthUrl(state) {
     const baseUrl = 'https://www.facebook.com/v23.0/dialog/oauth';
     const redirectUri = process.env.FACEBOOK_REDIRECT_URI || 'http://localhost:3002/auth/callback';
@@ -177,6 +224,7 @@ export class OAuthServer {
   }
 
   async start(port = 3002) {
+    this.port = port; // Store port for relay OAuth flow
     return new Promise((resolve, reject) => {
       this.server = this.app.listen(port, 'localhost', (error) => {
         if (error) {

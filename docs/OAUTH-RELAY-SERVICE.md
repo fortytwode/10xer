@@ -267,6 +267,16 @@ Add optional environment variable:
 
 ## Timeline
 
+### Updated Roadmap - August 11th, 2025
+
+**Streamlined 4-Day Implementation Plan** (Internal Team First)
+
+- **Day 1-2**: Build and deploy relay service to Railway
+- **Day 3**: Integrate relay support into MCP server
+- **Day 4**: Team testing and iteration
+
+### Original Timeline (Reference)
+
 - **Day 1**: Create and test relay service locally
 - **Day 2**: Deploy to Railway and test with development app
 - **Day 3**: Update MCP server to support relay
