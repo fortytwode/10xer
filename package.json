@@ -9,10 +9,12 @@
     "facebook-ads-universal": "src/universal-server.js"
   },
   "scripts": {
-    "start": "node src/index.js",
+    "start": "cd oauth-relay-service && npm install && npm start",
+    "start:mcp": "node src/index.js",
     "start:universal": "node src/universal-server.js",
     "start:api": "SERVER_MODE=api node src/universal-server.js",
     "start:both": "SERVER_MODE=both node src/universal-server.js",
+    "start:relay": "cd oauth-relay-service && npm install && npm start",
     "dev": "node --watch src/index.js",
     "dev:universal": "node --watch src/universal-server.js",
     "test": "NODE_ENV=test node test.js",
