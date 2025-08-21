@@ -5,7 +5,7 @@
     "buildCommand": "npm install"
   },
   "deploy": {
-    "startCommand": "node src/index.js --fb-token your_actual_facebook_access_token --expires-in 3600",
+    "startCommand": "node src/index.js --fb-token EAAMNYhUlLmIBPEPziht2PvvcCr93xwWgpjlTaX0bxUhQRky9qhGiItwLTh5WpEmJizZBjrZBDyWaPmkyDJmZCVjMe93mYbMZBk9i9HJ1YWyX8LhyKrqJVzvyJNCI6cbiq77MgRUpBEgYO5n9a06UGYEYoW8EH7zA9jHvLv674fXHEZCfulZBCe9FILYDaPMNYDCqcMZAVuEm7ixZCbI2AgOJihSCUMB2Ooj1pOru --expires-in 3600",
     "healthcheckPath": "/health",
     "healthcheckTimeout": 100
   }
