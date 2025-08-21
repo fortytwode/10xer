@@ -1,19 +1,32 @@
-import keytar from 'keytar';
+import fs from 'fs';
+import path from 'path';
 
-const SERVICE_NAME = 'facebook-ads-mcp';
-const ACCOUNT_NAME = 'facebook-access-token';
+const TOKEN_FILE = path.resolve('./.tokens.json');
+
+function saveToFile(tokenData) {
+  fs.writeFileSync(TOKEN_FILE, JSON.stringify(tokenData, null, 2));
+}
+
+function readFromFile() {
+  if (!fs.existsSync(TOKEN_FILE)) return null;
+  return JSON.parse(fs.readFileSync(TOKEN_FILE, 'utf8'));
+}
+
+function clearFile() {
+  if (fs.existsSync(TOKEN_FILE)) fs.unlinkSync(TOKEN_FILE);
+}
 
 export class TokenStorage {
   static async storeToken(accessToken, expiresIn = null) {
     try {
       const tokenData = {
         accessToken,
-        expiresAt: expiresIn ? Date.now() + (expiresIn * 1000) : null,
+        expiresAt: expiresIn ? Date.now() + expiresIn * 1000 : null,
         storedAt: Date.now()
       };
-      
-      await keytar.setPassword(SERVICE_NAME, ACCOUNT_NAME, JSON.stringify(tokenData));
-      console.error('✅ Facebook token stored securely');
+
+      saveToFile(tokenData);
+      console.error('✅ Facebook token stored in file (.tokens.json)');
       return true;
     } catch (error) {
       console.error('❌ Failed to store token:', error.message);
@@ -23,14 +36,9 @@ export class TokenStorage {
 
   static async getToken() {
     try {
-      const tokenJson = await keytar.getPassword(SERVICE_NAME, ACCOUNT_NAME);
-      if (!tokenJson) {
-        return null;
-      }
+      const tokenData = readFromFile();
+      if (!tokenData) return null;
 
-      const tokenData = JSON.parse(tokenJson);
-      
-      // Check if token is expired
       if (tokenData.expiresAt && Date.now() > tokenData.expiresAt) {
         console.error('⚠️ Stored token has expired');
         await this.clearToken();
@@ -46,8 +54,8 @@ export class TokenStorage {
 
   static async clearToken() {
     try {
-      await keytar.deletePassword(SERVICE_NAME, ACCOUNT_NAME);
-      console.error('🗑️ Facebook token cleared');
+      clearFile();
+      console.error('🗑️ Facebook token cleared (file)');
       return true;
     } catch (error) {
       console.error('❌ Failed to clear token:', error.message);
@@ -62,19 +70,18 @@ export class TokenStorage {
 
   static async getTokenInfo() {
     try {
-      const tokenJson = await keytar.getPassword(SERVICE_NAME, ACCOUNT_NAME);
-      if (!tokenJson) {
-        return { hasToken: false };
-      }
+      const tokenData = readFromFile();
+      if (!tokenData) return { hasToken: false };
 
-      const tokenData = JSON.parse(tokenJson);
       const isExpired = tokenData.expiresAt && Date.now() > tokenData.expiresAt;
-      
+
       return {
         hasToken: true,
         isExpired,
         storedAt: new Date(tokenData.storedAt).toISOString(),
-        expiresAt: tokenData.expiresAt ? new Date(tokenData.expiresAt).toISOString() : 'Never'
+        expiresAt: tokenData.expiresAt
+          ? new Date(tokenData.expiresAt).toISOString()
+          : 'Never'
       };
     } catch (error) {
       return { hasToken: false, error: error.message };
