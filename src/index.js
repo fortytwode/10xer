@@ -5,11 +5,16 @@ import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js';
 import dotenv from 'dotenv';
 
-// Express for HTTP server
 import express from 'express';
 import bodyParser from 'body-parser';
+import cors from 'cors';
 
-// Import tool handlers
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
 import { listAdAccounts } from './tools/list-ad-accounts.js';
 import { fetchPaginationUrl } from './tools/fetch-pagination.js';
 import { getAccountDetails } from './tools/get-account-details.js';
@@ -20,13 +25,10 @@ import { facebookLogin } from './tools/facebook-login.js';
 import { facebookLogout } from './tools/facebook-logout.js';
 import { facebookCheckAuth } from './tools/facebook-check-auth.js';
 
-// Import schemas
 import { TOOL_SCHEMAS } from './schemas/tool-schemas.js';
 
-// Load environment variables
 dotenv.config({ path: new URL('../.env', import.meta.url) });
 
-// CLI Token Support
 import { getFacebookTokenFromCLI } from './utils/cli-args.js';
 import { TokenStorage } from './auth/token-storage.js';
 
@@ -36,14 +38,12 @@ class FacebookAdsMCPServer {
       name: process.env.MCP_SERVER_NAME || 'facebook-ads-mcp',
       version: process.env.MCP_SERVER_VERSION || '1.0.0',
     }, {
-      capabilities: {
-        tools: {},
-      },
+      capabilities: { tools: {} },
     });
 
     this.setupToolHandlers();
 
-    // ✅ Auto-store CLI token if present
+    // Auto-store CLI token
     const { token, expiresIn } = getFacebookTokenFromCLI();
     if (token) {
       TokenStorage.storeToken(token, expiresIn)
@@ -84,33 +84,30 @@ class FacebookAdsMCPServer {
     });
   }
 
- async run() {
-    // STDIO transport (for CLI clients)
+  async run() {
     const stdioTransport = new StdioServerTransport();
     await this.server.connect(stdioTransport);
     console.error('✅ Facebook Ads MCP server running on stdio');
 
-    // HTTP transport (for web clients)
     const app = express();
     app.use(bodyParser.json());
+    app.use(cors());
 
-    // ✅ Welcome route
+    app.use(express.static('public'));
+
     app.get('/', (_req, res) => {
       res.send('👋 Welcome to Facebook Ads MCP server running');
     });
 
-    // ✅ Healthcheck route (for Railway / Docker / K8s)
-  app.get('/health', (_req, res) => {
-    res.json({ status: 'ok' });
-  });
+    app.get('/health', (_req, res) => {
+      res.sendFile(path.join(__dirname, 'public', 'index.html'));
+    });
 
-    // Expose tools list
     app.get('/tools', async (_req, res) => {
       const result = await this.server.request(ListToolsRequestSchema, {});
       res.json(result);
     });
 
-    // Call a tool
     app.post('/tool', async (req, res) => {
       try {
         const result = await this.server.request(CallToolRequestSchema, {
@@ -123,6 +120,25 @@ class FacebookAdsMCPServer {
       }
     });
 
+    // ✅ New API: accept Facebook token from frontend
+    app.post('/auth/token', async (req, res) => {
+      try {
+        const { accessToken, expiresIn } = req.body;
+        if (!accessToken) {
+          return res.status(400).json({ error: 'Missing accessToken' });
+        }
+        await TokenStorage.storeToken(accessToken, expiresIn);
+        res.json({ success: true, message: 'Token stored successfully' });
+      } catch (err) {
+        res.status(500).json({ error: err.message });
+      }
+    });
+
+    app.get('/auth/token-info', async (_req, res) => {
+      const info = await TokenStorage.getTokenInfo();
+      res.json(info);
+    });
+
     const port = process.env.PORT || 3000;
     app.listen(port, () => {
       console.error(`🌍 Facebook Ads MCP server running on http://localhost:${port}`);
@@ -130,17 +146,6 @@ class FacebookAdsMCPServer {
   }
 }
 
-// Handle process errors
-process.on('uncaughtException', (error) => {
-  console.error('Uncaught exception:', error);
-  process.exit(1);
-});
-process.on('unhandledRejection', (reason, promise) => {
-  console.error('Unhandled rejection at:', promise, 'reason:', reason);
-  process.exit(1);
-});
-
-// Start the server
 const server = new FacebookAdsMCPServer();
 server.run().catch((error) => {
   console.error('Failed to start server:', error);

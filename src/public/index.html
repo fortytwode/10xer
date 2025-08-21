@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Facebook Token Login</title>
+</head>
+<body>
+  <h2>🔑 Enter Facebook Access Token</h2>
+  <form id="tokenForm">
+    <input type="text" id="accessToken" placeholder="Enter Facebook Access Token" style="width: 400px;" required>
+    <br><br>
+    <input type="number" id="expiresIn" placeholder="Expires In (seconds)" style="width: 200px;">
+    <br><br>
+    <button type="submit">Save Token</button>
+  </form>
+
+  <p id="response"></p>
+
+  <script>
+    document.getElementById('tokenForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const accessToken = document.getElementById('accessToken').value;
+      const expiresIn = document.getElementById('expiresIn').value;
+
+      const res = await fetch('http://localhost:3000/auth/token', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ accessToken, expiresIn: expiresIn ? parseInt(expiresIn) : null })
+      });
+
+      const data = await res.json();
+      document.getElementById('response').innerText = JSON.stringify(data, null, 2);
+    });
+  </script>
+</body>
+</html>
