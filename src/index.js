@@ -99,6 +99,11 @@ class FacebookAdsMCPServer {
       res.send('👋 Welcome to Facebook Ads MCP server running');
     });
 
+    // ✅ Healthcheck route (for Railway / Docker / K8s)
+  app.get('/health', (_req, res) => {
+    res.json({ status: 'ok' });
+  });
+
     // Expose tools list
     app.get('/tools', async (_req, res) => {
       const result = await this.server.request(ListToolsRequestSchema, {});
