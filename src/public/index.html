@@ -2,35 +2,85 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Facebook Token Login</title>
+  <title>Facebook Direct OAuth Login</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #f0f2f5;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      margin: 0;
+    }
+    .card {
+      background: #fff;
+      padding: 2rem;
+      border-radius: 12px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+      text-align: center;
+      max-width: 400px;
+      width: 100%;
+    }
+    h2 {
+      margin-bottom: 1.5rem;
+      color: #1c1e21;
+    }
+    #fbLoginBtn {
+      background-color: #1877f2;
+      color: white;
+      font-size: 16px;
+      font-weight: bold;
+      border: none;
+      border-radius: 8px;
+      padding: 12px 20px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      transition: background 0.3s ease;
+    }
+    #fbLoginBtn:hover {
+      background-color: #165ec9;
+    }
+    #fbLoginBtn svg {
+      margin-right: 8px;
+    }
+    footer {
+      margin-top: 1.5rem;
+      font-size: 0.85rem;
+      color: #606770;
+    }
+  </style>
 </head>
 <body>
-  <h2>🔑 Enter Facebook Access Token</h2>
-  <form id="tokenForm">
-    <input type="text" id="accessToken" placeholder="Enter Facebook Access Token" style="width: 400px;" required>
-    <br><br>
-    <input type="number" id="expiresIn" placeholder="Expires In (seconds)" style="width: 200px;">
-    <br><br>
-    <button type="submit">Save Token</button>
-  </form>
-
-  <p id="response"></p>
+  <div class="card">
+    <h2>🔐 Connect Your Facebook Account</h2>
+    <button id="fbLoginBtn">
+      <!-- Inline Facebook SVG logo -->
+      <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="white" viewBox="0 0 24 24">
+        <path d="M22.675 0h-21.35C.597 0 0 .597 0 1.326v21.348C0 23.403.597 24 1.326 
+        24h11.495v-9.294H9.691v-3.622h3.13V8.413c0-3.1 1.893-4.788 
+        4.659-4.788 1.325 0 2.466.099 2.797.143v3.24l-1.918.001c-1.505 
+        0-1.796.715-1.796 1.764v2.313h3.587l-.467 3.622h-3.12V24h6.116C23.403 
+        24 24 23.403 24 22.674V1.326C24 .597 23.403 0 22.675 0z"/>
+      </svg>
+      Continue with Facebook
+    </button>
+    <footer>We only request permissions necessary to manage ads.</footer>
+  </div>
 
   <script>
-    document.getElementById('tokenForm').addEventListener('submit', async (e) => {
-      e.preventDefault();
-      const accessToken = document.getElementById('accessToken').value;
-      const expiresIn = document.getElementById('expiresIn').value;
+    document.getElementById('fbLoginBtn').addEventListener('click', async () => {
+      const res = await fetch('/config');
+      const { facebookAppId } = await res.json();
 
-      const res = await fetch('http://localhost:3000/auth/token', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ accessToken, expiresIn: expiresIn ? parseInt(expiresIn) : null })
-      });
+      const redirectUri = encodeURIComponent(window.location.origin + '/auth/callback');
+      const scope = encodeURIComponent('pages_show_list,ads_management,ads_read,business_management,pages_read_engagement,pages_read_user_content,pages_manage_ads');
+      const fbUrl = `https://www.facebook.com/v21.0/dialog/oauth?client_id=${facebookAppId}&redirect_uri=${redirectUri}&response_type=token&scope=${scope}`;
 
-      const data = await res.json();
-      document.getElementById('response').innerText = JSON.stringify(data, null, 2);
+      window.location.href = fbUrl;
     });
   </script>
 </body>
 </html>
+

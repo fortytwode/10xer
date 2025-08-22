@@ -103,6 +103,14 @@ class FacebookAdsMCPServer {
       res.sendFile(path.join(__dirname, 'public', 'index.html'));
     });
 
+    app.get('/auth/callback', (_req, res) => {
+      res.sendFile(path.join(__dirname, 'public', '/auth/callback.html'));
+    });
+
+    app.get('/config', (_req, res) => {
+      res.json({ facebookAppId: process.env.FACEBOOK_APP_ID });
+    });
+
     app.get('/tools', async (_req, res) => {
       const result = await this.server.request(ListToolsRequestSchema, {});
       res.json(result);
