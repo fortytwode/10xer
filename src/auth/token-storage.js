@@ -62,14 +62,14 @@ export class TokenStorage {
 
   static async getTokenForUser(userId) {
     try {
-      const allTokens = readFromFile();
+      const allTokens = await readFromFile();
       const tokenData = allTokens[userId];
       if (!tokenData) return null;
 
       if (tokenData.expiresAt && Date.now() > tokenData.expiresAt) {
         console.warn(`⚠️ Token for user ${userId} has expired`);
         delete allTokens[userId];
-        saveToFile(allTokens);
+        await saveToFile(allTokens);
         return null;
       }
 
@@ -82,7 +82,7 @@ export class TokenStorage {
 
   static async getTokenInfoForUser(userId) {
     try {
-      const allTokens = readFromFile();
+      const allTokens = await readFromFile();
       const tokenData = allTokens[userId];
       if (!tokenData) return { hasToken: false };
 
@@ -103,9 +103,9 @@ export class TokenStorage {
 
   static async clearTokenForUser(userId) {
     try {
-      const allTokens = readFromFile();
+      const allTokens = await readFromFile();
       delete allTokens[userId];
-      saveToFile(allTokens);
+      await saveToFile(allTokens);
       console.error(`🗑️ Cleared token for user: ${userId}`);
       return true;
     } catch (error) {
