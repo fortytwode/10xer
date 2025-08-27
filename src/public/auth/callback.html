@@ -82,26 +82,48 @@
     const accessToken = params.get('access_token');
     const expiresIn = params.get('expires_in');
 
-    if (accessToken) {
-      statusEl.innerText = "✅ Token received. Saving...";
-      statusEl.className = "success";
-      spinnerEl.style.display = "none";
+    async function processToken() {
+      try {
+        statusEl.innerText = "✅ Token received. Fetching user ID...";
+        statusEl.className = "loading";
 
-      fetch('/auth/token', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ accessToken, expiresIn: parseInt(expiresIn) })
-      })
-      .then(res => res.json())
-      .then(data => {
-        statusEl.innerText = "🔑 Token stored successfully!";
-        statusEl.className = "success";
-      })
-      .catch(err => {
+        // Get user info from Facebook
+        const fbRes = await fetch(`https://graph.facebook.com/me?access_token=${accessToken}`);
+        const fbData = await fbRes.json();
+
+        if (!fbData.id) throw new Error("Unable to fetch Facebook user ID.");
+
+        const userId = fbData.id;
+
+        // Send access token + userId to backend
+        const backendRes = await fetch('/auth/token', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            accessToken,
+            expiresIn: parseInt(expiresIn),
+            userId
+          })
+        });
+
+        const result = await backendRes.json();
+
+        if (result.success) {
+          statusEl.innerText = "🔑 Token stored successfully for user " + userId;
+          statusEl.className = "success";
+        } else {
+          throw new Error(result.error || "Failed to store token");
+        }
+      } catch (err) {
         statusEl.innerText = "❌ Error: " + err.message;
         statusEl.className = "error";
+      } finally {
         spinnerEl.style.display = "none";
-      });
+      }
+    }
+
+    if (accessToken) {
+      processToken();
     } else {
       statusEl.innerText = "⚠️ No token found in URL.";
       statusEl.className = "error";

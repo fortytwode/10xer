@@ -44,9 +44,9 @@ class FacebookAdsMCPServer {
     this.setupToolHandlers();
 
     // Auto-store CLI token
-    const { token, expiresIn } = getFacebookTokenFromCLI();
+    const { userId, token, expiresIn } = getFacebookTokenFromCLI();
     if (token) {
-      TokenStorage.storeToken(token, expiresIn)
+      TokenStorage.storeTokenForUser(userId, token, expiresIn)
         .then(() => console.error('✅ CLI Facebook token stored on startup'))
         .catch((err) => console.error('❌ Failed to store CLI token on startup:', err.message));
     }
@@ -91,7 +91,9 @@ class FacebookAdsMCPServer {
 
     const app = express();
     app.use(bodyParser.json());
-    app.use(cors());
+    app.use(cors({
+      origin: process.env.TOKEN_API_BASE_URL || 'http://localhost:3000/'
+    }));
 
     app.use(express.static('public'));
 
@@ -128,15 +130,55 @@ class FacebookAdsMCPServer {
       }
     });
 
-    // ✅ New API: accept Facebook token from frontend
+    // POST /auth/token — store token per user
     app.post('/auth/token', async (req, res) => {
       try {
-        const { accessToken, expiresIn } = req.body;
-        if (!accessToken) {
-          return res.status(400).json({ error: 'Missing accessToken' });
+        const { userId, accessToken, expiresIn } = req.body;
+
+        if (!userId || !accessToken) {
+          return res.status(400).json({ error: 'Missing userId or accessToken' });
         }
-        await TokenStorage.storeToken(accessToken, expiresIn);
+
+        await TokenStorage.storeTokenForUser(userId, accessToken, expiresIn);
         res.json({ success: true, message: 'Token stored successfully' });
+      } catch (err) {
+        res.status(500).json({ error: err.message });
+      }
+    });
+
+    // GET /auth/token/:userId — get user's token
+    app.get('/auth/token/:userId', async (req, res) => {
+      try {
+        const userId = req.params.userId;
+        const token = await TokenStorage.getTokenForUser(userId);
+
+        if (!token) {
+          return res.status(404).json({ error: 'Token not found or expired' });
+        }
+
+        res.json({ success: true, accessToken: token });
+      } catch (err) {
+        res.status(500).json({ error: err.message });
+      }
+    });
+
+    // GET /auth/token-info/:userId — token status/info
+    app.get('/auth/token-info/:userId', async (req, res) => {
+      try {
+        const userId = req.params.userId;
+        const info = await TokenStorage.getTokenInfoForUser(userId);
+        res.json(info);
+      } catch (err) {
+        res.status(500).json({ error: err.message });
+      }
+    });
+
+    // DELETE /auth/token/:userId — clear token
+    app.delete('/auth/token/:userId', async (req, res) => {
+      try {
+        const userId = req.params.userId;
+        await TokenStorage.clearTokenForUser(userId);
+        res.json({ success: true, message: 'Token cleared' });
       } catch (err) {
         res.status(500).json({ error: err.message });
       }

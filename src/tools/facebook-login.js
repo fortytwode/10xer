@@ -8,15 +8,17 @@ let oauthServer = null;
 export async function facebookLogin(args) {
   try {
     // 🔍 Step 1: Look for CLI-provided token
-    const { token: cliToken, expiresIn } = getFacebookTokenFromCLI();
+    // const { token: cliToken, expiresIn } = getFacebookTokenFromCLI();
+
+    const { token: cliToken, expiresIn, userId } = getFacebookTokenFromCLI();
 
     if (cliToken) {
-      await TokenStorage.storeToken(cliToken, expiresIn);
+      await TokenStorage.storeToken(cliToken, expiresIn, userId);  // pass userId here if you want to associate it
       return {
         content: [
           {
             type: 'text',
-            text: '✅ Facebook token provided via CLI. You are now logged in.',
+            text: `✅ Facebook token provided via CLI for user ID ${userId}. You are now logged in.`,
           },
         ],
       };
