@@ -1,7 +1,18 @@
 import fs from 'fs';
 import path from 'path';
 
-const TOKEN_FILE = path.resolve('./.tokens.json');
+const TMP_DIR = path.join(process.cwd(), 'tmp'); // Use ./tmp inside current directory
+
+// Create the ./tmp folder if it doesn't exist
+if (!fs.existsSync(TMP_DIR)) {
+  fs.mkdirSync(TMP_DIR, { recursive: true });
+  console.log(`📂 Created tmp directory at: ${TMP_DIR}`);
+}
+
+const TOKEN_FILE = path.join(TMP_DIR, '.tokens.json');
+
+console.log(`📁 Token file path: ${TOKEN_FILE}`);
+
 
 // async function readFromFile() {
 //   try {
