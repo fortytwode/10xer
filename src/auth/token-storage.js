@@ -11,6 +11,17 @@ if (!fs.existsSync(TMP_DIR)) {
 
 const TOKEN_FILE = path.join(TMP_DIR, '.tokens.json');
 
+if (fs.existsSync(TOKEN_FILE)) {
+  try {
+    fs.unlinkSync(TOKEN_FILE);  // Delete the old token file
+    console.log(`🗑️ Cleared old token file at: ${TOKEN_FILE}`);
+  } catch (err) {
+    console.error(`❌ Failed to clear old token file: ${err.message}`);
+  }
+} else {
+  console.log('ℹ️ No existing token file to clear.');
+}
+
 console.log(`📁 Token file path: ${TOKEN_FILE}`);
 
 
