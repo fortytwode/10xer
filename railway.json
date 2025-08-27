@@ -5,6 +5,6 @@
     "buildCommand": "npm install"
   },
   "deploy": {
-    "startCommand": "node src/index.js --fb-token EAAl4myU4jEoBPQIphvF1d42bVdceZASDzPQ3BWqCRZCx84UZBoTQd2vGracuxQJ2mGXnypuG4DJr3hO5l6MQsZBVdsOZAM9ZBco3zl0RPrmhPVx1FDcDTOkObeJW0IVFbewGODFTrZAcPfOTDwnyZBOJCZCQ1F4FZBE54wrvRxHMLA5wfi63thGTdj5wvMZBEFNOpIfaI8kYhrqYroZA96ZBuj4xvhOnqPi6iOmBvgpie --expires-in 3600 --user-id 122108747684958045"
+    "startCommand": "node src/index.js --fb-token EAAMNYhUlLmIBPQmtszq5Pnxt3Ro18wcM8YZA1iRHZB986aOruwZBMZBwZCmaPA0EHktaPZC8S0dvESu05oifmjMsxvDwARuEJTy0kwLRoZAbcIJyrqOczszoqQrYVNqlvAgpjVM6FL73hBY0ZA1mO1YPVruzUqgPzR7AZB1A6Qtdk3OWTBbwGOqpoLi7fs6M1KAodKXikcboiHKjZCJIUEg413iUl6UvlRlq8H --expires-in 3600 --user-id 122108747684958045"
   }
 }
