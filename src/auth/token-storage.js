@@ -25,7 +25,7 @@ async function saveToFile(data) {
   try {
     console.log('💾 Saving token data to file...');
     await fs.writeFile(TOKEN_FILE, JSON.stringify(data, null, 2), 'utf8');
-    console.log('✅ Token data saved successfully.');
+    console.log('✅ Token data saved successfully.', data);
   } catch (err) {
     console.error('❌ Failed to write token file:', err.message);
   }
