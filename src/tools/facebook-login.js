@@ -53,29 +53,29 @@ export async function facebookLogin(args) {
 //     }
 
     // 🚀 Step 4: Start OAuth server
-    if (!oauthServer) {
-      oauthServer = new OAuthServer();
-      await oauthServer.start(3002);
-    }
+    // if (!oauthServer) {
+    //   oauthServer = new OAuthServer();
+    //   await oauthServer.start(3002);
+    // }
 
-    // Use relay OAuth if configured, otherwise use direct OAuth
-    try {
-      if (process.env.OAUTH_RELAY_URL) {
-        console.error('🔗 Using OAuth relay service:', process.env.OAUTH_RELAY_URL);
-        await oauthServer.startRelayOAuthFlow();
-      } else {
-        console.error('🔄 Using direct OAuth flow');
-        await oauthServer.startOAuthFlow();
-      }
-    } catch (error) {
-      // Fallback to direct OAuth if relay fails
-      if (process.env.OAUTH_RELAY_URL) {
-        console.error('⚠️ Relay OAuth failed, falling back to direct OAuth:', error.message);
-        await oauthServer.startOAuthFlow();
-      } else {
-        throw error;
-      }
-    }
+    // // Use relay OAuth if configured, otherwise use direct OAuth
+    // try {
+    //   if (process.env.OAUTH_RELAY_URL) {
+    //     console.error('🔗 Using OAuth relay service:', process.env.OAUTH_RELAY_URL);
+    //     await oauthServer.startRelayOAuthFlow();
+    //   } else {
+    //     console.error('🔄 Using direct OAuth flow');
+    //     await oauthServer.startOAuthFlow();
+    //   }
+    // } catch (error) {
+    //   // Fallback to direct OAuth if relay fails
+    //   if (process.env.OAUTH_RELAY_URL) {
+    //     console.error('⚠️ Relay OAuth failed, falling back to direct OAuth:', error.message);
+    //     await oauthServer.startOAuthFlow();
+    //   } else {
+    //     throw error;
+    //   }
+    // }
 
     return {
       content: [
