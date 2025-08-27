@@ -1,50 +1,49 @@
-import fs from 'fs';
+import fs from 'fs/promises';
 import path from 'path';
 
 const TOKEN_FILE = path.resolve('./.tokens.json');
 
-// async function readFromFile() {
-//   try {
-//     console.log('🔍 Checking if token file exists...');
-//     await fs.access(TOKEN_FILE); // Check if file exists
-//     console.log('📂 Token file found, reading content...');
-//     const content = await fs.readFile(TOKEN_FILE, 'utf8');
-//     console.log('✅ Token file read successfully.');
-//     return JSON.parse(content);
-//   } catch (err) {
-//     if (err.code !== 'ENOENT') {
-//       console.error('❌ Failed to read token file:', err.message);
-//     } else {
-//       console.log('ℹ️ Token file does not exist yet.');
-//     }
-//     return {};
-//   }
-// }
-
-// async function saveToFile(data) {
-//   try {
-//     console.log('💾 Saving token data to file...');
-//     await fs.writeFile(TOKEN_FILE, JSON.stringify(data, null, 2), 'utf8');
-//     console.log('✅ Token data saved successfully.', data);
-//   } catch (err) {
-//     console.error('❌ Failed to write token file:', err.message);
-//   }
-// }
-
-function readFromFile() {
-  if (!fs.existsSync(TOKEN_FILE)) return {};
-  return JSON.parse(fs.readFileSync(TOKEN_FILE, 'utf8'));
+async function readFromFile() {
+  try {
+    console.log('🔍 Checking if token file exists...');
+    await fs.access(TOKEN_FILE); // Check if file exists
+    console.log('📂 Token file found, reading content...');
+    const content = await fs.readFile(TOKEN_FILE, 'utf8');
+    console.log('✅ Token file read successfully.');
+    return JSON.parse(content);
+  } catch (err) {
+    if (err.code !== 'ENOENT') {
+      console.error('❌ Failed to read token file:', err.message);
+    } else {
+      console.log('ℹ️ Token file does not exist yet.');
+    }
+    return {};
+  }
 }
 
-function saveToFile(data) {
-  console.log('✅ Token data saved successfully.', data);
-  fs.writeFileSync(TOKEN_FILE, JSON.stringify(data, null, 2));
+async function saveToFile(data) {
+  try {
+    console.log('💾 Saving token data to file...');
+    await fs.writeFile(TOKEN_FILE, JSON.stringify(data, null, 2), 'utf8');
+    console.log('✅ Token data saved successfully.', data);
+  } catch (err) {
+    console.error('❌ Failed to write token file:', err.message);
+  }
 }
+
+// function readFromFile() {
+//   if (!fs.existsSync(TOKEN_FILE)) return {};
+//   return JSON.parse(fs.readFileSync(TOKEN_FILE, 'utf8'));
+// }
+
+// function saveToFile(data) {
+//   fs.writeFileSync(TOKEN_FILE, JSON.stringify(data, null, 2));
+// }
 
 export class TokenStorage {
   static async storeTokenForUser(userId, accessToken, expiresIn = null) {
     try {
-      const allTokens = readFromFile();
+      const allTokens = await readFromFile();
 
       allTokens[userId] = {
         accessToken,
@@ -52,7 +51,7 @@ export class TokenStorage {
         expiresAt: expiresIn ? Date.now() + expiresIn * 1000 : null
       };
 
-      saveToFile(allTokens);
+      await saveToFile(allTokens);
       console.error(`✅ Token stored for user: ${userId}`);
       return true;
     } catch (err) {
@@ -63,14 +62,14 @@ export class TokenStorage {
 
   static async getTokenForUser(userId) {
     try {
-      const allTokens = readFromFile();
+      const allTokens = await readFromFile();
       const tokenData = allTokens[userId];
       if (!tokenData) return null;
 
       if (tokenData.expiresAt && Date.now() > tokenData.expiresAt) {
         console.warn(`⚠️ Token for user ${userId} has expired`);
         delete allTokens[userId];
-        saveToFile(allTokens);
+        await saveToFile(allTokens);
         return null;
       }
 
@@ -83,7 +82,7 @@ export class TokenStorage {
 
   static async getTokenInfoForUser(userId) {
     try {
-      const allTokens = readFromFile();
+      const allTokens = await readFromFile();
       const tokenData = allTokens[userId];
       if (!tokenData) return { hasToken: false };
 
@@ -104,9 +103,9 @@ export class TokenStorage {
 
   static async clearTokenForUser(userId) {
     try {
-      const allTokens = readFromFile();
+      const allTokens = await readFromFile();
       delete allTokens[userId];
-      saveToFile(allTokens);
+      await saveToFile(allTokens);
       console.error(`🗑️ Cleared token for user: ${userId}`);
       return true;
     } catch (error) {
