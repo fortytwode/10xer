@@ -5,12 +5,30 @@ const TOKEN_FILE = path.resolve('./.tokens.json');
 
 function readFromFile() {
   if (!fs.existsSync(TOKEN_FILE)) return {};
-  return JSON.parse(fs.readFileSync(TOKEN_FILE, 'utf8'));
+  try {
+    return JSON.parse(fs.readFileSync(TOKEN_FILE, 'utf8'));
+  } catch (err) {
+    console.error('❌ Failed to read token file:', err.message);
+    return {};
+  }
 }
 
 function saveToFile(data) {
-  fs.writeFileSync(TOKEN_FILE, JSON.stringify(data, null, 2));
+  try {
+    fs.writeFileSync(TOKEN_FILE, JSON.stringify(data, null, 2));
+  } catch (err) {
+    console.error('❌ Failed to write token file:', err.message);
+  }
 }
+
+// function readFromFile() {
+//   if (!fs.existsSync(TOKEN_FILE)) return {};
+//   return JSON.parse(fs.readFileSync(TOKEN_FILE, 'utf8'));
+// }
+
+// function saveToFile(data) {
+//   fs.writeFileSync(TOKEN_FILE, JSON.stringify(data, null, 2));
+// }
 
 export class TokenStorage {
   static async storeTokenForUser(userId, accessToken, expiresIn = null) {
