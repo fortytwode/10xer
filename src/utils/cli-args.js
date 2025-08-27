@@ -3,12 +3,12 @@ export function getFacebookTokenFromCLI() {
   const expiresInIndex = process.argv.indexOf('--expires-in');
   const userIdIndex = process.argv.indexOf('--user-id');
 
-  let accessToken = null;
+  let token = null;
   let expiresIn = null;
   let userId = 'cli-user'; // default fallback
 
   if (tokenIndex !== -1 && tokenIndex + 1 < process.argv.length) {
-    accessToken = process.argv[tokenIndex + 1];
+    token = process.argv[tokenIndex + 1];
   }
 
   if (expiresInIndex !== -1 && expiresInIndex + 1 < process.argv.length) {
@@ -19,5 +19,5 @@ export function getFacebookTokenFromCLI() {
     userId = process.argv[userIdIndex + 1];
   }
 
-  return { userId, accessToken, expiresIn };
+  return { token, expiresIn, userId };
 }

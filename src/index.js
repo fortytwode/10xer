@@ -44,9 +44,9 @@ class FacebookAdsMCPServer {
     this.setupToolHandlers();
 
     // Auto-store CLI token
-    const { userId, accessToken, expiresIn } = getFacebookTokenFromCLI();
-    if (accessToken) {
-      TokenStorage.storeTokenForUser(userId, accessToken, expiresIn)
+    const{ token, expiresIn, userId } = getFacebookTokenFromCLI();
+    if (token) {
+      TokenStorage.storeTokenForUser(userId, token, expiresIn)
         .then(() => console.error('✅ CLI Facebook token stored on startup'))
         .catch((err) => console.error('❌ Failed to store CLI token on startup:', err.message));
     }
