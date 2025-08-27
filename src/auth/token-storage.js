@@ -36,9 +36,41 @@ function readFromFile() {
   return JSON.parse(fs.readFileSync(TOKEN_FILE, 'utf8'));
 }
 
-function saveToFile(data) {
-  console.log('✅ Token data saved successfully.', data);
-  fs.writeFileSync(TOKEN_FILE, JSON.stringify(data, null, 2));
+function saveToFile(newData) {
+  console.log('📥 Incoming new data:', newData);
+
+  let existingData = {};
+
+  // Load existing file if it exists
+  if (fs.existsSync(TOKEN_FILE)) {
+    try {
+      const fileContent = fs.readFileSync(TOKEN_FILE, 'utf8');
+      console.log('📄 Existing token file content:', fileContent);
+      existingData = JSON.parse(fileContent);
+      console.log('✅ Parsed existing data:', existingData);
+    } catch (error) {
+      console.error('❌ Failed to read or parse token file.', error);
+    }
+  } else {
+    console.log('ℹ️ Token file does not exist. A new one will be created.');
+  }
+
+  // Merge or add new data
+  for (const userId in newData) {
+    console.log(`🔄 Updating user ID ${userId}`);
+    existingData[userId] = newData[userId];
+  }
+
+  // Final data to be written
+  console.log('📝 Final data to be written:', existingData);
+
+  // Write updated data back to file
+  try {
+    fs.writeFileSync(TOKEN_FILE, JSON.stringify(existingData, null, 2));
+    console.log('✅ Token data saved successfully.');
+  } catch (error) {
+    console.error('❌ Failed to save token data.', error);
+  }
 }
 
 export class TokenStorage {
