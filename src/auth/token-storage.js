@@ -1,21 +1,31 @@
-import fs from 'fs';
+import fs from 'fs/promises';
 import path from 'path';
 
 const TOKEN_FILE = path.resolve('./.tokens.json');
 
-function readFromFile() {
-  if (!fs.existsSync(TOKEN_FILE)) return {};
+async function readFromFile() {
   try {
-    return JSON.parse(fs.readFileSync(TOKEN_FILE, 'utf8'));
+    console.log('🔍 Checking if token file exists...');
+    await fs.access(TOKEN_FILE); // Check if file exists
+    console.log('📂 Token file found, reading content...');
+    const content = await fs.readFile(TOKEN_FILE, 'utf8');
+    console.log('✅ Token file read successfully.');
+    return JSON.parse(content);
   } catch (err) {
-    console.error('❌ Failed to read token file:', err.message);
+    if (err.code !== 'ENOENT') {
+      console.error('❌ Failed to read token file:', err.message);
+    } else {
+      console.log('ℹ️ Token file does not exist yet.');
+    }
     return {};
   }
 }
 
-function saveToFile(data) {
+async function saveToFile(data) {
   try {
-    fs.writeFileSync(TOKEN_FILE, JSON.stringify(data, null, 2));
+    console.log('💾 Saving token data to file...');
+    await fs.writeFile(TOKEN_FILE, JSON.stringify(data, null, 2), 'utf8');
+    console.log('✅ Token data saved successfully.');
   } catch (err) {
     console.error('❌ Failed to write token file:', err.message);
   }
@@ -33,7 +43,7 @@ function saveToFile(data) {
 export class TokenStorage {
   static async storeTokenForUser(userId, accessToken, expiresIn = null) {
     try {
-      const allTokens = readFromFile();
+      const allTokens = await readFromFile();
 
       allTokens[userId] = {
         accessToken,
@@ -41,7 +51,7 @@ export class TokenStorage {
         expiresAt: expiresIn ? Date.now() + expiresIn * 1000 : null
       };
 
-      saveToFile(allTokens);
+      await saveToFile(allTokens);
       console.error(`✅ Token stored for user: ${userId}`);
       return true;
     } catch (err) {
