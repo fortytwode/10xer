@@ -70,7 +70,7 @@ export class TokenStorage {
       if (tokenData.expiresAt && Date.now() > tokenData.expiresAt) {
         console.warn(`⚠️ Token for user ${userId} has expired`);
         delete allTokens[userId];
-        await saveToFile(allTokens);
+        saveToFile(allTokens);
         return null;
       }
 
@@ -106,7 +106,7 @@ export class TokenStorage {
     try {
       const allTokens = readFromFile();
       delete allTokens[userId];
-      await saveToFile(allTokens);
+      saveToFile(allTokens);
       console.error(`🗑️ Cleared token for user: ${userId}`);
       return true;
     } catch (error) {
