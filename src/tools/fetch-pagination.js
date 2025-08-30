@@ -2,13 +2,13 @@ import { FacebookAPIClient } from '../utils/facebook-api.js';
 import { createErrorResponse } from '../utils/error-handler.js';
 import { ValidationSchemas, validateParameters } from '../utils/validation.js';
 
-export async function fetchPaginationUrl(args) {
+export async function fetchPaginationUrl(args, accessToken) {
   try {
     // Validate input parameters
     const validatedArgs = validateParameters(ValidationSchemas.paginationUrl, args);
     const { url } = validatedArgs;
 
-    const client = new FacebookAPIClient();
+    const client = new FacebookAPIClient(accessToken);
     const data = await client.makeRequestFromFullURL(url);
 
     return {

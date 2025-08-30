@@ -1,0 +1,66 @@
+{
+  "dxt_version": "0.1",
+  "name": "10xer",
+  "display_name": "10xer MCP Server",
+  "version": "0.1.0",
+  "description": "Extension to connect Claude with the 10xer MCP Server for real-time event streaming.",
+  "long_description": "The 10xer MCP Server extension enables integration with the 10xer MCP Server, allowing Claude to communicate via server-sent events (SSE) and proxy commands through a local Node.js server.",
+  "author": {
+    "name": "10xer MCP",
+    "email": "mahmadimran1110@gmail.com",
+    "url": "http://localhost:8000/"
+  },
+  "repository": {
+    "type": "git",
+    "url": "http://localhost:8000/"
+  },
+  "homepage": "http://localhost:8000/",
+  "icon": "favicon.png",
+  "server": {
+    "type": "node",
+    "entry_point": "src/index.js",
+    "mcp_config": {
+      "command": "node",
+      "args": [
+        "${__dirname}/src/index.js",
+        "10xer MCP Server",
+        "http://localhost:8000/mcp-api/sse",
+        "${user_config.api_key}"
+      ],
+      "env": {
+        "SERVER_NAME": "10xer MCP Server",
+        "SSE_URL": "http://localhost:8000/mcp-api/sse",
+        "API_KEY": "${user_config.api_key}"
+      }
+    }
+  },
+  "tools": [
+  ],
+  "keywords": [
+    "stdio",
+    "sse",
+    "mcp",
+    "proxy"
+  ],
+  "license": "MIT",
+  "user_config": {
+    "api_key": {
+      "type": "string",
+      "title": "10xer MCP Server API Key",
+      "description": "Enter your API key generated from the 10xer MCP Server integration page. Visit http://localhost:8000/integrations/integrations to create or manage your keys.",
+      "sensitive": true,
+      "required": true
+    }
+  },
+  "compatibility": {
+    "claude_desktop": ">=0.10.0",
+    "platforms": [
+      "darwin",
+      "win32",
+      "linux"
+    ],
+    "runtimes": {
+      "node": ">=16.0.0"
+    }
+  }
+}

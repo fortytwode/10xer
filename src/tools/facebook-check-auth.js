@@ -1,7 +1,7 @@
 import { TokenStorage } from '../auth/token-storage.js';
 import { createErrorResponse } from '../utils/error-handler.js';
 
-export async function facebookCheckAuth(args) {
+export async function facebookCheckAuth(args, accessToken) {
   try {
     const tokenInfo = await TokenStorage.getTokenInfo();
     

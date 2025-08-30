@@ -1,9 +1,9 @@
 import { FacebookAPIClient } from '../utils/facebook-api.js';
 import { createErrorResponse } from '../utils/error-handler.js';
 
-export async function listAdAccounts(args) {
+export async function listAdAccounts(args, accessToken) {
   try {
-    const client = new FacebookAPIClient();
+    const client = new FacebookAPIClient(accessToken);
     
     // Get user ID first
     const userResponse = await client.makeRequest('/me', { fields: 'id' });

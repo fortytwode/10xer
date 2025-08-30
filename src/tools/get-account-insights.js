@@ -3,13 +3,13 @@ import { createErrorResponse } from '../utils/error-handler.js';
 import { ValidationSchemas, validateParameters } from '../utils/validation.js';
 
 
-export async function getAccountInsights(args) {
+export async function getAccountInsights(args, accessToken) {
   try {
     // Validate input parameters
     const validatedArgs = validateParameters(ValidationSchemas.accountInsights, args);
     const { act_id, fields, level, ...otherParams } = validatedArgs;
 
-    const client = new FacebookAPIClient();
+    const client = new FacebookAPIClient(accessToken);
     
     // Step 1: Query Performance Data + Configuration
     // Automatically include 'conversions' when 'actions' is requested for better conversion tracking

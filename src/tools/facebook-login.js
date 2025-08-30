@@ -10,10 +10,10 @@ export async function facebookLogin(args) {
     // 🔍 Step 1: Look for CLI-provided token
     // const { token: cliToken, expiresIn } = getFacebookTokenFromCLI();
 
-    const { token: cliToken, expiresIn, userId } = getFacebookTokenFromCLI();
+    const { token: userId, cliToken, expiresIn } = getFacebookTokenFromCLI();
 
     if (cliToken) {
-      await TokenStorage.storeToken(cliToken, expiresIn, userId);  // pass userId here if you want to associate it
+      await TokenStorage.storeTokenForUser(userId, cliToken, expiresIn);  // pass userId here if you want to associate it
       return {
         content: [
           {
@@ -25,7 +25,7 @@ export async function facebookLogin(args) {
     }
 
     // 🔐 Step 2: Check for existing valid stored token
-    const hasToken = await TokenStorage.hasValidToken();
+    const hasToken = await TokenStorage.getTokenInfoForUser(userId);
     if (hasToken) {
       return {
         content: [

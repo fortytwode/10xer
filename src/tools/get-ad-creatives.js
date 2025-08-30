@@ -7,12 +7,12 @@ import axios from 'axios';
  * Get ad creatives for specific ad IDs
  * Focused tool that only fetches creative assets
  */
-export async function getAdCreatives(args) {
+export async function getAdCreatives(args, accessToken) {
   try {
     const validatedArgs = validateParameters(ValidationSchemas.adCreatives, args);
     const { ad_ids, include_images = true } = validatedArgs;
 
-    const facebookAPI = new FacebookAPIClient();
+    const facebookAPI = new FacebookAPIClient(accessToken);
     console.error(`🖼️ Fetching creatives for ${ad_ids.length} ads`);
 
     // Batch request for efficiency

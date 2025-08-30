@@ -2,13 +2,13 @@ import { FacebookAPIClient } from '../utils/facebook-api.js';
 import { createErrorResponse } from '../utils/error-handler.js';
 import { ValidationSchemas, validateParameters } from '../utils/validation.js';
 
-export async function getAccountDetails(args) {
+export async function getAccountDetails(args, accessToken) {
   try {
     // Validate input parameters
     const validatedArgs = validateParameters(ValidationSchemas.accountDetails, args);
     const { act_id, fields } = validatedArgs;
 
-    const client = new FacebookAPIClient();
+    const client = new FacebookAPIClient(accessToken);
     
     const params = {};
     if (fields && fields.length > 0) {
