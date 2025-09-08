@@ -257,7 +257,7 @@ class FacebookAdsMCPServer {
   });
 
   this.setupToolHandlers();
-  this.fetchFacebookAccessToken();
+  // this.fetchFacebookAccessToken();
 }
 
   // Example helper to do fetch with auth headers from instance props
