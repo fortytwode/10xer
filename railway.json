@@ -5,6 +5,6 @@
     "buildCommand": "npm install"
   },
   "deploy": {
-    "startCommand": "node src/index.js --fb-token $FB_TOKEN --expires-in 3600 --user-id $USER_ID"
+    "startCommand": "node src/index.js --server-name $SERVER_NAME --sse-url $SSE_URL --api-key $API_KEY"
   }
 }
