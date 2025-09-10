@@ -2,6 +2,7 @@
 
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
+import { SSEServerTransport } from '@modelcontextprotocol/sdk/server/sse.js';
 import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js';
 import dotenv from 'dotenv';
 
@@ -125,10 +126,6 @@ class FacebookAdsMCPServer {
   }
 
   async run() {
-    const stdioTransport = new StdioServerTransport();
-    await this.server.connect(stdioTransport);
-    console.error('✅ Facebook Ads MCP server running on stdio');
-
     const app = express();
     app.use(bodyParser.json());
     app.use(cors({
@@ -201,9 +198,27 @@ class FacebookAdsMCPServer {
       }
     });
 
+    // Add MCP SSE endpoint
+    app.get('/mcp', (req, res) => {
+      const sseTransport = new SSEServerTransport('/mcp', req, res);
+      this.server.connect(sseTransport).catch(err => {
+        console.error('SSE connection error:', err);
+        res.status(500).send('MCP connection failed');
+      });
+    });
+
+    app.post('/mcp', (req, res) => {
+      const sseTransport = new SSEServerTransport('/mcp', req, res);
+      this.server.connect(sseTransport).catch(err => {
+        console.error('SSE connection error:', err);
+        res.status(500).send('MCP connection failed');
+      });
+    });
+
     const port = process.env.PORT || 3000;
     app.listen(port, () => {
       console.error(`🌍 Facebook Ads MCP server running on http://localhost:${port}`);
+      console.error(`🔗 MCP endpoint available at http://localhost:${port}/mcp`);
     });
   }
 }
