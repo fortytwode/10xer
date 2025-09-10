@@ -141,6 +141,23 @@ class UniversalFacebookAdsServer {
         }
       }
     });
+
+    // Claude OAuth endpoints
+    this.apiServer.get('/mcp/start-auth/', (req, res) => {
+      // For now, indicate that authentication is handled via tools
+      res.json({
+        auth_url: `${process.env.DEPLOYED_URL || 'https://10xer-production.up.railway.app'}/auth/facebook`,
+        type: "oauth2"
+      });
+    });
+
+    this.apiServer.get('/mcp/auth-status/', (req, res) => {
+      // Return authentication status - will be checked via facebook_check_auth tool
+      res.json({
+        authenticated: false,
+        message: "Use facebook_check_auth tool to verify authentication status"
+      });
+    });
   }
 
   setupMCPHandlers() {
