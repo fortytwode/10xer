@@ -118,20 +118,28 @@ class UniversalFacebookAdsServer {
     });
 
     // MCP SSE endpoints for Claude connector
-    this.apiServer.get('/mcp', (req, res) => {
-      const sseTransport = new SSEServerTransport('/mcp', req, res);
-      this.mcpServer.connect(sseTransport).catch(err => {
+    this.apiServer.get('/mcp', async (req, res) => {
+      try {
+        const sseTransport = new SSEServerTransport('/mcp', res);
+        await this.mcpServer.connect(sseTransport);
+      } catch (err) {
         console.error('SSE connection error:', err);
-        res.status(500).send('MCP connection failed');
-      });
+        if (!res.headersSent) {
+          res.status(500).send('MCP connection failed');
+        }
+      }
     });
 
-    this.apiServer.post('/mcp', (req, res) => {
-      const sseTransport = new SSEServerTransport('/mcp', req, res);
-      this.mcpServer.connect(sseTransport).catch(err => {
-        console.error('SSE connection error:', err);
-        res.status(500).send('MCP connection failed');
-      });
+    this.apiServer.post('/mcp', async (req, res) => {
+      try {
+        const sseTransport = new SSEServerTransport('/mcp', res);
+        await sseTransport.handlePostMessage(req, res);
+      } catch (err) {
+        console.error('SSE POST error:', err);
+        if (!res.headersSent) {
+          res.status(500).send('MCP POST failed');
+        }
+      }
     });
   }
 
