@@ -2,6 +2,7 @@
 
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
+import { SSEServerTransport } from '@modelcontextprotocol/sdk/server/sse.js';
 import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js';
 import express from 'express';
 import cors from 'cors';
@@ -114,6 +115,23 @@ class UniversalFacebookAdsServer {
         description: this.adapters.mcp.getToolDescription(name)
       }));
       res.json({ tools });
+    });
+
+    // MCP SSE endpoints for Claude connector
+    this.apiServer.get('/mcp', (req, res) => {
+      const sseTransport = new SSEServerTransport('/mcp', req, res);
+      this.mcpServer.connect(sseTransport).catch(err => {
+        console.error('SSE connection error:', err);
+        res.status(500).send('MCP connection failed');
+      });
+    });
+
+    this.apiServer.post('/mcp', (req, res) => {
+      const sseTransport = new SSEServerTransport('/mcp', req, res);
+      this.mcpServer.connect(sseTransport).catch(err => {
+        console.error('SSE connection error:', err);
+        res.status(500).send('MCP connection failed');
+      });
     });
   }
 
