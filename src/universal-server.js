@@ -65,33 +65,28 @@ class UniversalFacebookAdsServer {
   }
 
   setupApiServer() {
+    this.apiServer.use(cors());
+    this.apiServer.use(express.json({ limit: '50mb' }));
+
     this.apiServer.get('/mcp', async (req, res) => {
       try {
         this.activeSseTransport = new SSEServerTransport('/mcp', res);
         await this.mcpServer.connect(this.activeSseTransport);
       } catch (err) {
         console.error('SSE connection error:', err);
-        if (!res.headersSent) {
-          res.status(500).send('MCP connection failed');
-        }
+        if (!res.headersSent) res.status(500).send('MCP connection failed');
       }
     });
 
     this.apiServer.post('/mcp', async (req, res) => {
       try {
-        if (!this.activeSseTransport) {
-          throw new Error('SSE connection not established');
-        }
+        if (!this.activeSseTransport) throw new Error('SSE connection not established');
         await this.activeSseTransport.handlePostMessage(req, res);
       } catch (err) {
         console.error('SSE POST error:', err);
-        if (!res.headersSent) {
-          res.status(500).send('MCP POST failed');
-        }
+        if (!res.headersSent) res.status(500).send('MCP POST failed');
       }
     });
-    this.apiServer.use(cors());
-    this.apiServer.use(express.json({ limit: '50mb' }));
     
     // Health check endpoint
     this.apiServer.get('/health', (req, res) => {
