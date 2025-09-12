@@ -28,6 +28,7 @@ import { facebookCheckAuth } from './tools/facebook-check-auth.js';
 // Import schemas
 import { TOOL_SCHEMAS } from './schemas/tool-schemas.js';
 import { CLAUDE_CONNECTOR_MANIFEST } from './claude-connector-manifest.js';
+import path from 'path';
 
 // Load environment variables
 dotenv.config({ path: new URL('../.env', import.meta.url) });
