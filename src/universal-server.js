@@ -31,6 +31,8 @@ import { CLAUDE_CONNECTOR_MANIFEST } from './claude-connector-manifest.js';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
+import open from 'open';
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 // Load environment variables
@@ -349,14 +351,20 @@ class UniversalFacebookAdsServer {
     const tokenUrl = 'https://10xer-web-production.up.railway.app/api/facebook/token';
 
     try {
-      // Since this is server-side, no window.open. Just check integrations status.
+      // 1) Open the integrations URL in the user's default browser
+      await open(integrationsUrl);
+
+      // 2) Then check the integrations API response
       const integrationsRes = await fetch(integrationsUrl);
 
       if (integrationsRes.status === 401 || integrationsRes.status === 404) {
         const redirectUrl = 'https://10xer-web-production.up.railway.app/login';
-        console.error(`🔴 Integrations API returned ${integrationsRes.status}, need user to login at: ${redirectUrl}`);
+        console.error(`🔴 Integrations API returned ${integrationsRes.status}, opening login page in browser: ${redirectUrl}`);
 
-        // Instead of redirecting here, throw an error including redirect URL
+        // 3) Open the login URL in the browser for user to authenticate
+        await open(redirectUrl);
+
+        // Throw error so caller knows to handle this case
         const error = new Error('Redirect to login required');
         error.redirect = redirectUrl;
         throw error;
@@ -368,6 +376,7 @@ class UniversalFacebookAdsServer {
 
       console.log('✅ Integrations check succeeded. Proceeding to fetch Facebook token.');
 
+      // 4) Fetch the Facebook token now
       const tokenRes = await fetch(tokenUrl);
       if (!tokenRes.ok) {
         throw new Error(`Facebook token fetch failed: ${tokenRes.status}`);
@@ -385,6 +394,7 @@ class UniversalFacebookAdsServer {
       throw err;
     }
   }
+
 
   // async startMCP() {
   //   const transport = new StdioServerTransport();
