@@ -275,78 +275,74 @@ class UniversalFacebookAdsServer {
   // }
 
   async executeToolCall({ toolName, args }) {
-    // Strip prefix if present (assuming prefix and tool name are separated by colon)
-    const normalizedToolName = toolName.includes(':') ? toolName.split(':')[1] : toolName;
+    const normalizedToolName = toolName.toLowerCase();
 
-    // List of tools requiring token remains the same
-    const toolsRequiringToken = [
+    // Handle the tools that need facebookAccessToken
+    const toolsNeedingToken = new Set([
       'facebook_list_ad_accounts',
       'facebook_fetch_pagination_url',
       'facebook_get_details_of_ad_account',
       'facebook_get_adaccount_insights',
       'facebook_get_activities_by_adaccount',
-      'facebook_get_ad_creatives',
-      'facebook_get_ad_thumbnails'
-    ];
+      'facebook_get_ad_creatives'
+    ]);
 
-    if (toolsRequiringToken.includes(normalizedToolName) && !this.facebookAccessToken) {
-      console.log(`ℹ️ Token required for "${normalizedToolName}", fetching Facebook token...`);
-      try {
-        await this.fetchFacebookAccessToken();
-      } catch (error) {
-        console.error('❌ Failed to fetch Facebook token:', error);
-        throw new Error('Facebook token fetch failed. Please authenticate via the connector.');
-      }
-
+    if (toolsNeedingToken.has(normalizedToolName)) {
       if (!this.facebookAccessToken) {
-        throw new Error('Facebook access token not found after fetch');
+        console.log(`ℹ️ Token required for "${normalizedToolName}", fetching Facebook token...`);
+        try {
+          await this.fetchFacebookAccessToken();
+        } catch (error) {
+          console.error('❌ Failed to fetch Facebook token:', error);
+          throw new Error('Facebook token fetch failed. Please authenticate via the connector.');
+        }
+
+        if (!this.facebookAccessToken) {
+          throw new Error('Facebook access token not found after fetch');
+        }
       }
     }
 
-    switch (normalizedToolName) {
-      case 'facebook_login':
-        return await facebookLogin(args);
+    // Map tool names to functions
+    const toolFunctionMap = {
+      'facebook_login': facebookLogin,
+      'facebook_logout': facebookLogout,
+      'facebook_check_auth': facebookCheckAuth,
+      'facebook_list_ad_accounts': listAdAccounts,
+      'facebook_fetch_pagination_url': fetchPaginationUrl,
+      'facebook_get_details_of_ad_account': getAccountDetails,
+      'facebook_get_adaccount_insights': getAccountInsights,
+      'facebook_get_activities_by_adaccount': getAccountActivities,
+      'facebook_get_ad_creatives': getAdCreatives,
+      // ... add other tools as needed
+    };
 
-      case 'facebook_logout':
-        return await facebookLogout(args);
+    if (normalizedToolName === 'facebook_get_ad_thumbnails') {
+      throw new Error('get_ad_thumbnails_embedded tool is temporarily disabled');
+    }
 
-      case 'facebook_check_auth':
-        return await facebookCheckAuth(args);
+    if (normalizedToolName === '_list_tools') {
+      return {
+        content: [{
+          type: 'text',
+          text: JSON.stringify(Object.keys(toolFunctionMap), null, 2)
+        }]
+      };
+    }
 
-      case 'facebook_list_ad_accounts':
-        return await listAdAccounts(args, this.facebookAccessToken);
+    const toolFn = toolFunctionMap[normalizedToolName];
 
-      case 'facebook_fetch_pagination_url':
-        return await fetchPaginationUrl(args, this.facebookAccessToken);
+    if (!toolFn) {
+      throw new Error(`Unknown tool: ${normalizedToolName}`);
+    }
 
-      case 'facebook_get_details_of_ad_account':
-        return await getAccountDetails(args, this.facebookAccessToken);
-
-      case 'facebook_get_adaccount_insights':
-        return await getAccountInsights(args, this.facebookAccessToken);
-
-      case 'facebook_get_activities_by_adaccount':
-        return await getAccountActivities(args, this.facebookAccessToken);
-
-      case 'facebook_get_ad_creatives':
-        return await getAdCreatives(args, this.facebookAccessToken);
-
-      case 'facebook_get_ad_thumbnails':
-        throw new Error('get_ad_thumbnails_embedded tool is temporarily disabled');
-
-      case '_list_tools':
-        return {
-          content: [{
-            type: 'text',
-            text: JSON.stringify(Object.keys(TOOL_SCHEMAS), null, 2)
-          }]
-        };
-
-      default:
-        throw new Error(`Unknown tool: ${normalizedToolName}`);
+    // Call tool function with token if needed
+    if (toolsNeedingToken.has(normalizedToolName)) {
+      return await toolFn(args, this.facebookAccessToken);
+    } else {
+      return await toolFn(args);
     }
   }
-
 
   async fetchFacebookAccessToken() {
     const integrationsUrl = 'https://10xer-web-production.up.railway.app/integrations/integrations';
