@@ -283,7 +283,7 @@ class UniversalFacebookAdsServer {
               Step 2: <a href="https://10xer-web-production.up.railway.app/integrations/integrations" target="_blank" rel="noopener noreferrer">Visit the Integrations Page</a>
             </p>
             <p>Once logged in, click the button below to continue:</p>
-            <form method="POST" action="/trigger-token-fetch">
+            <form method="GET" action="/trigger-token-fetch">
               <button type="submit">✅ I'm Logged In – Continue</button>
             </form>
           </main>
@@ -292,13 +292,39 @@ class UniversalFacebookAdsServer {
       `);
     });
 
-    this.apiServer.post('/trigger-token-fetch', async (req, res) => {
+    this.apiServer.get('/trigger-token-fetch', async (req, res) => {
       try {
-        await this.fetchFacebookAccessToken();
-        if (this.facebookAccessToken) {
-          res.send(`<h2>✅ Token fetched! You may now return to the app.</h2>`);
+        // Extract the session cookie from the incoming request headers
+        const sessionCookie = req.headers.cookie
+          ?.split(';')
+          .map(c => c.trim())
+          .find(c => c.startsWith('session='));
+
+        if (!sessionCookie) {
+          return res.status(401).send('<h2>❌ No session cookie found. Please log in first.</h2>');
+        }
+
+        console.log("sessionCookie->", sessionCookie);
+
+        // Call the Facebook token API with the session cookie in the headers, using GET method
+        const response = await fetch('https://10xer-web-production.up.railway.app/integrations/api/facebook/token', {
+          method: 'GET',
+          headers: {
+            'Cookie': sessionCookie,  // Pass the session cookie here
+          }
+        });
+
+        if (!response.ok) {
+          throw new Error(`Token API responded with status ${response.status}`);
+        }
+
+        const data = await response.json();
+
+        if (data && data.access_token) {
+          this.facebookAccessToken = data.access_token;
+          res.send('<h2>✅ Token fetched! You may now return to the app.</h2>');
         } else {
-          res.status(500).send(`<h2>❌ Token fetch failed. Try again after logging in.</h2>`);
+          res.status(500).send('<h2>❌ Token fetch failed. No access token returned.</h2>');
         }
       } catch (error) {
         console.error('Token fetch failed:', error);
