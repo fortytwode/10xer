@@ -292,25 +292,61 @@ class UniversalFacebookAdsServer {
       `);
     });
 
-    this.apiServer.get('/trigger-token-fetch', async (req, res) => {
-      try {
-        // Extract the session cookie from the incoming request headers
-        const sessionCookie = req.headers.cookie
-          ?.split(';')
-          .map(c => c.trim())
-          .find(c => c.startsWith('session='));
+    // this.apiServer.get('/trigger-token-fetch', async (req, res) => {
+    //   try {
+    //     // Extract the session cookie from the incoming request headers
+    //     const sessionCookie = req.headers.cookie
+    //       ?.split(';')
+    //       .map(c => c.trim())
+    //       .find(c => c.startsWith('session='));
 
-        if (!sessionCookie) {
-          return res.status(401).send('<h2>❌ No session cookie found. Please log in first.</h2>');
+    //     if (!sessionCookie) {
+    //       return res.status(401).send('<h2>❌ No session cookie found. Please log in first.</h2>');
+    //     }
+
+    //     console.log("sessionCookie->", sessionCookie);
+
+    //     // Call the Facebook token API with the session cookie in the headers, using GET method
+    //     const response = await fetch('https://10xer-web-production.up.railway.app/integrations/api/facebook/token', {
+    //       method: 'GET',
+    //       headers: {
+    //         'Cookie': sessionCookie,  // Pass the session cookie here
+    //       }
+    //     });
+
+    //     if (!response.ok) {
+    //       throw new Error(`Token API responded with status ${response.status}`);
+    //     }
+
+    //     const data = await response.json();
+
+    //     if (data && data.access_token) {
+    //       this.facebookAccessToken = data.access_token;
+    //       res.send('<h2>✅ Token fetched! You may now return to the app.</h2>');
+    //     } else {
+    //       res.status(500).send('<h2>❌ Token fetch failed. No access token returned.</h2>');
+    //     }
+    //   } catch (error) {
+    //     console.error('Token fetch failed:', error);
+    //     res.status(500).send(`<h2>❌ Error: ${error.message}</h2>`);
+    //   }
+    // });
+
+    this.apiServer.post('/trigger-token-fetch', async (req, res) => {
+      try {
+        const { access_token, user_id } = req.body;
+
+        if (!access_token || !user_id) {
+          return res.status(400).send('<h2>❌ Missing access_token or user_id.</h2>');
         }
 
-        console.log("sessionCookie->", sessionCookie);
+        console.log('✅ Received access token and user ID:', access_token, user_id);
 
-        // Call the Facebook token API with the session cookie in the headers, using GET method
+        // Step 2: Forward the token to MCP
         const response = await fetch('https://10xer-web-production.up.railway.app/integrations/api/facebook/token', {
           method: 'GET',
           headers: {
-            'Cookie': sessionCookie,  // Pass the session cookie here
+            'Authorization': access_token,  // Pass the session cookie here
           }
         });
 
@@ -327,8 +363,30 @@ class UniversalFacebookAdsServer {
           res.status(500).send('<h2>❌ Token fetch failed. No access token returned.</h2>');
         }
       } catch (error) {
-        console.error('Token fetch failed:', error);
-        res.status(500).send(`<h2>❌ Error: ${error.message}</h2>`);
+        console.error('❌ Error forwarding token:', error);
+        return res.status(500).send(`<h2>❌ Error: ${error.message}</h2>`);
+      }
+    });
+
+    this.apiServer.get('/save-trigger-token-fetch', (req, res) => {
+      try {
+        if (this.facebookAccessToken) {
+          res.json({
+            success: true,
+            access_token: this.facebookAccessToken
+          });
+        } else {
+          res.status(404).json({
+            success: false,
+            message: 'No token saved yet.'
+          });
+        }
+      } catch (error) {
+        console.error('Error retrieving saved token:', error);
+        res.status(500).json({
+          success: false,
+          message: 'Internal server error'
+        });
       }
     });
   }
