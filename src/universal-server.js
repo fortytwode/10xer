@@ -31,7 +31,7 @@ import { CLAUDE_CONNECTOR_MANIFEST } from './claude-connector-manifest.js';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
-import open from 'open';
+import puppeteer from 'puppeteer';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -275,72 +275,56 @@ class UniversalFacebookAdsServer {
   // }
 
   async executeToolCall({ toolName, args }) {
-    const normalizedToolName = toolName.toLowerCase();
 
-    // Handle the tools that need facebookAccessToken
-    const toolsNeedingToken = new Set([
-      'facebook_list_ad_accounts',
-      'facebook_fetch_pagination_url',
-      'facebook_get_details_of_ad_account',
-      'facebook_get_adaccount_insights',
-      'facebook_get_activities_by_adaccount',
-      'facebook_get_ad_creatives'
-    ]);
-
-    if (toolsNeedingToken.has(normalizedToolName)) {
+    // Step 1: fetch token before the switch if needed
+    if (toolName.startsWith('facebook_') && toolName !== 'facebook_login' && toolName !== 'facebook_logout' && toolName !== 'facebook_check_auth') {
+      await this.fetchFacebookAccessToken();
       if (!this.facebookAccessToken) {
-        console.log(`ℹ️ Token required for "${normalizedToolName}", fetching Facebook token...`);
-        try {
-          await this.fetchFacebookAccessToken();
-        } catch (error) {
-          console.error('❌ Failed to fetch Facebook token:', error);
-          throw new Error('Facebook token fetch failed. Please authenticate via the connector.');
-        }
-
-        if (!this.facebookAccessToken) {
-          throw new Error('Facebook access token not found after fetch');
-        }
+        throw new Error('Facebook access token not found after fetch');
       }
     }
+    switch (toolName) {
+      case 'facebook_login':
+        return await facebookLogin(args);
 
-    // Map tool names to functions
-    const toolFunctionMap = {
-      'facebook_login': facebookLogin,
-      'facebook_logout': facebookLogout,
-      'facebook_check_auth': facebookCheckAuth,
-      'facebook_list_ad_accounts': listAdAccounts,
-      'facebook_fetch_pagination_url': fetchPaginationUrl,
-      'facebook_get_details_of_ad_account': getAccountDetails,
-      'facebook_get_adaccount_insights': getAccountInsights,
-      'facebook_get_activities_by_adaccount': getAccountActivities,
-      'facebook_get_ad_creatives': getAdCreatives,
-      // ... add other tools as needed
-    };
+      case 'facebook_logout':
+        return await facebookLogout(args);
 
-    if (normalizedToolName === 'facebook_get_ad_thumbnails') {
-      throw new Error('get_ad_thumbnails_embedded tool is temporarily disabled');
-    }
+      case 'facebook_check_auth':
+        return await facebookCheckAuth(args);
 
-    if (normalizedToolName === '_list_tools') {
-      return {
-        content: [{
-          type: 'text',
-          text: JSON.stringify(Object.keys(toolFunctionMap), null, 2)
-        }]
-      };
-    }
+      case 'facebook_list_ad_accounts':
+        return await listAdAccounts(args, this.facebookAccessToken);
 
-    const toolFn = toolFunctionMap[normalizedToolName];
+      case 'facebook_fetch_pagination_url':
+        return await fetchPaginationUrl(args, this.facebookAccessToken);
 
-    if (!toolFn) {
-      throw new Error(`Unknown tool: ${normalizedToolName}`);
-    }
+      case 'facebook_get_details_of_ad_account':
+        return await getAccountDetails(args, this.facebookAccessToken);
 
-    // Call tool function with token if needed
-    if (toolsNeedingToken.has(normalizedToolName)) {
-      return await toolFn(args, this.facebookAccessToken);
-    } else {
-      return await toolFn(args);
+      case 'facebook_get_adaccount_insights':
+        return await getAccountInsights(args, this.facebookAccessToken);
+
+      case 'facebook_get_activities_by_adaccount':
+        return await getAccountActivities(args, this.facebookAccessToken);
+
+      case 'facebook_get_ad_creatives':
+        return await getAdCreatives(args, this.facebookAccessToken);
+
+      case 'facebook_get_ad_thumbnails':
+        // return await getAdThumbnailsEmbedded(args);
+        throw new Error('get_ad_thumbnails_embedded tool is temporarily disabled');
+
+      case '_list_tools':
+        return {
+          content: [{
+            type: 'text',
+            text: JSON.stringify(Object.keys(TOOL_SCHEMAS), null, 2)
+          }]
+        };
+
+      default:
+        throw new Error(`Unknown tool: ${toolName}`);
     }
   }
 
@@ -349,28 +333,54 @@ class UniversalFacebookAdsServer {
     const loginUrl = 'https://10xer-web-production.up.railway.app/login';
     const tokenUrl = 'https://10xer-web-production.up.railway.app/api/facebook/token';
 
+    const browser = await puppeteer.launch({ headless: true });
+    const page = await browser.newPage();
+
     try {
-      // 1) Open the integrations URL in the user's default browser
-      await open(integrationsUrl);
+      // 1) Open integrations URL
+      const response = await page.goto(integrationsUrl, { waitUntil: 'networkidle2' });
 
-      // 2) Immediately open the login URL in the browser
-      await open(loginUrl);
+      // 2) If not logged in (e.g. redirected to login page), navigate to login URL
+      if (response.url() === loginUrl) {
+        console.log('Not logged in, please login manually or automate login here');
 
-      // 3) Fetch the Facebook token now
-      const tokenRes = await fetch(tokenUrl);
-      if (!tokenRes.ok) {
-        throw new Error(`Facebook token fetch failed: ${tokenRes.status}`);
+        // Optional: automate login here if you have credentials & selectors
+        // await page.type('input#username', 'your-username');
+        // await page.type('input#password', 'your-password');
+        // await page.click('button#login');
+        // await page.waitForNavigation({ waitUntil: 'networkidle2' });
       }
 
-      const data = await tokenRes.json();
+      // 3) Extract session cookies
+      const cookies = await page.cookies();
+      const sessionCookie = cookies.find(cookie => cookie.name === 'session');
+
+      if (!sessionCookie) {
+        throw new Error('Session cookie not found. Please login first.');
+      }
+
+      // 4) Use fetch to call token API with the session cookie attached
+      const tokenResponse = await fetch(tokenUrl, {
+        headers: {
+          Cookie: `session=${sessionCookie.value}`,
+        },
+      });
+
+      if (!tokenResponse.ok) {
+        throw new Error(`Facebook token fetch failed: ${tokenResponse.status}`);
+      }
+
+      const data = await tokenResponse.json();
 
       if (data && data.success === true && typeof data.facebook_access_token === 'string') {
-        this.facebookAccessToken = data.facebook_access_token;
-        console.log('✅ Facebook access token fetched:', this.facebookAccessToken.slice(0, 10) + '...');
+        console.log('✅ Facebook access token fetched:', data.facebook_access_token.slice(0, 10) + '...');
+        await browser.close();
+        return data.facebook_access_token;
       } else {
         throw new Error('Facebook token not found or invalid in response');
       }
     } catch (err) {
+      await browser.close();
       throw err;
     }
   }
