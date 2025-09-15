@@ -349,17 +349,14 @@ class UniversalFacebookAdsServer {
     const tokenUrl = 'https://10xer-web-production.up.railway.app/api/facebook/token';
 
     try {
-      // First open the integrations URL in a new tab/window
-      window.open(integrationsUrl, '_blank');
-
-      // Then fetch the integrations API
+      // Since this is server-side, no window.open. Just check integrations status.
       const integrationsRes = await fetch(integrationsUrl);
 
       if (integrationsRes.status === 401 || integrationsRes.status === 404) {
         const redirectUrl = 'https://10xer-web-production.up.railway.app/login';
-        console.error(`🔴 Integrations API returned ${integrationsRes.status}, redirecting to login: ${redirectUrl}`);
-        // Redirect in current tab/window
-        window.location.href = redirectUrl;
+        console.error(`🔴 Integrations API returned ${integrationsRes.status}, need user to login at: ${redirectUrl}`);
+
+        // Instead of redirecting here, throw an error including redirect URL
         const error = new Error('Redirect to login required');
         error.redirect = redirectUrl;
         throw error;
@@ -388,7 +385,6 @@ class UniversalFacebookAdsServer {
       throw err;
     }
   }
-
 
   // async startMCP() {
   //   const transport = new StdioServerTransport();
