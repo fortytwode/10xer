@@ -466,7 +466,7 @@ class UniversalFacebookAdsServer {
 
     // Step 1: fetch token before the switch if needed
     if (toolName.startsWith('facebook_') && toolName !== 'facebook_login' && toolName !== 'facebook_logout' && toolName !== 'facebook_check_auth') {
-      await this.fetchFacebookAccessToken();
+      // await this.fetchFacebookAccessToken();
       if (!this.facebookAccessToken) {
         throw new Error('Facebook access token not found after fetch');
       }
