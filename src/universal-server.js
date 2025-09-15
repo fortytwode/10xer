@@ -275,7 +275,10 @@ class UniversalFacebookAdsServer {
   // }
 
   async executeToolCall({ toolName, args }) {
-    // Only tools that require the Facebook access token
+    // Strip prefix if present (assuming prefix and tool name are separated by colon)
+    const normalizedToolName = toolName.includes(':') ? toolName.split(':')[1] : toolName;
+
+    // List of tools requiring token remains the same
     const toolsRequiringToken = [
       'facebook_list_ad_accounts',
       'facebook_fetch_pagination_url',
@@ -286,11 +289,10 @@ class UniversalFacebookAdsServer {
       'facebook_get_ad_thumbnails'
     ];
 
-    // Fetch the token if needed
-    if (toolsRequiringToken.includes(toolName) && !this.facebookAccessToken) {
-      console.log(`ℹ️ Token required for "${toolName}", fetching Facebook token...`);
+    if (toolsRequiringToken.includes(normalizedToolName) && !this.facebookAccessToken) {
+      console.log(`ℹ️ Token required for "${normalizedToolName}", fetching Facebook token...`);
       try {
-        await this.fetchFacebookAccessTokenIfIntegrationOK();
+        await this.fetchFacebookAccessToken();
       } catch (error) {
         console.error('❌ Failed to fetch Facebook token:', error);
         throw new Error('Facebook token fetch failed. Please authenticate via the connector.');
@@ -301,8 +303,7 @@ class UniversalFacebookAdsServer {
       }
     }
 
-    // Proceed with tool execution
-    switch (toolName) {
+    switch (normalizedToolName) {
       case 'facebook_login':
         return await facebookLogin(args);
 
@@ -342,41 +343,24 @@ class UniversalFacebookAdsServer {
         };
 
       default:
-        throw new Error(`Unknown tool: ${toolName}`);
+        throw new Error(`Unknown tool: ${normalizedToolName}`);
     }
   }
 
-  async fetchFacebookAccessTokenIfIntegrationOK() {
+
+  async fetchFacebookAccessToken() {
     const integrationsUrl = 'https://10xer-web-production.up.railway.app/integrations/integrations';
+    const loginUrl = 'https://10xer-web-production.up.railway.app/login';
     const tokenUrl = 'https://10xer-web-production.up.railway.app/api/facebook/token';
 
     try {
       // 1) Open the integrations URL in the user's default browser
       await open(integrationsUrl);
 
-      // 2) Then check the integrations API response
-      const integrationsRes = await fetch(integrationsUrl);
+      // 2) Immediately open the login URL in the browser
+      await open(loginUrl);
 
-      if (integrationsRes.status === 401 || integrationsRes.status === 404) {
-        const redirectUrl = 'https://10xer-web-production.up.railway.app/login';
-        console.error(`🔴 Integrations API returned ${integrationsRes.status}, opening login page in browser: ${redirectUrl}`);
-
-        // 3) Open the login URL in the browser for user to authenticate
-        await open(redirectUrl);
-
-        // Throw error so caller knows to handle this case
-        const error = new Error('Redirect to login required');
-        error.redirect = redirectUrl;
-        throw error;
-      }
-
-      if (integrationsRes.status !== 200) {
-        throw new Error(`Integrations API returned unexpected status ${integrationsRes.status}`);
-      }
-
-      console.log('✅ Integrations check succeeded. Proceeding to fetch Facebook token.');
-
-      // 4) Fetch the Facebook token now
+      // 3) Fetch the Facebook token now
       const tokenRes = await fetch(tokenUrl);
       if (!tokenRes.ok) {
         throw new Error(`Facebook token fetch failed: ${tokenRes.status}`);
