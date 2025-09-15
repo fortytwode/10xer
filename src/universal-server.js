@@ -346,7 +346,7 @@ class UniversalFacebookAdsServer {
         console.log('✅ Received access token and user ID:', access_token, user_id);
 
         // Validate token by requesting MCP
-        const response = await fetch('http://localhost:5005/integrations/api/facebook/token', {
+        const response = await fetch('https://10xer-web-production.up.railway.app/integrations/api/facebook/token', {
           method: 'GET',
           headers: {
             'Authorization': access_token,
