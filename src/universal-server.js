@@ -48,7 +48,8 @@ class UniversalFacebookAdsServer {
       mcp: new MCPAdapter(),
       openai: new OpenAIAdapter(), 
       gemini: new GeminiAdapter(),
-      facebookAccessToken: null
+      facebookAccessToken: null,
+      user_id: null
     };
 
     // Initialize MCP server (existing functionality)
@@ -61,7 +62,8 @@ class UniversalFacebookAdsServer {
       },
     });
 
-    this.facebookAccessToken = null;
+    this.facebookAccessTokens = {}; // Example: { "user_id1": "token1", "user_id2": "token2" }
+    this.user_id = null
 
     // Initialize Express server for API endpoints
     this.apiServer = express();
@@ -332,6 +334,7 @@ class UniversalFacebookAdsServer {
     //   }
     // });
 
+    // POST: Save token for a specific user
     this.apiServer.post('/trigger-token-fetch', async (req, res) => {
       try {
         const { access_token, user_id } = req.body;
@@ -342,11 +345,11 @@ class UniversalFacebookAdsServer {
 
         console.log('✅ Received access token and user ID:', access_token, user_id);
 
-        // Step 2: Forward the token to MCP
-        const response = await fetch('https://10xer-web-production.up.railway.app/integrations/api/facebook/token', {
+        // Validate token by requesting MCP
+        const response = await fetch('http://localhost:5005/integrations/api/facebook/token', {
           method: 'GET',
           headers: {
-            'Authorization': access_token,  // Pass the session cookie here
+            'Authorization': access_token,
           }
         });
 
@@ -357,8 +360,11 @@ class UniversalFacebookAdsServer {
         const data = await response.json();
 
         if (data && data.access_token) {
-          this.facebookAccessToken = data.access_token;
-          res.send('<h2>✅ Token fetched! You may now return to the app.</h2>');
+          // ✅ Save token per user_id
+          this.facebookAccessTokens[user_id] = data.access_token;
+          this.user_id = data.user_id
+
+          res.send('<h2>✅ Token fetched and saved! You may now return to the app.</h2>');
         } else {
           res.status(500).send('<h2>❌ Token fetch failed. No access token returned.</h2>');
         }
@@ -370,19 +376,32 @@ class UniversalFacebookAdsServer {
 
     this.apiServer.get('/save-trigger-token-fetch', (req, res) => {
       try {
-        if (this.facebookAccessToken) {
+        const user_id = req.query.user_id;
+
+        if (user_id) {
+          const token = this.facebookAccessTokens[user_id];
+
+          if (token) {
+            res.json({
+              success: true,
+              user_id,
+              access_token: token
+            });
+          } else {
+            res.status(404).json({
+              success: false,
+              message: 'No token found for given user_id'
+            });
+          }
+        } else {
+          // No user_id provided — return all tokens
           res.json({
             success: true,
-            access_token: this.facebookAccessToken
-          });
-        } else {
-          res.status(404).json({
-            success: false,
-            message: 'No token saved yet.'
+            tokens: this.facebookAccessTokens
           });
         }
       } catch (error) {
-        console.error('Error retrieving saved token:', error);
+        console.error('Error retrieving saved token(s):', error);
         res.status(500).json({
           success: false,
           message: 'Internal server error'
@@ -463,44 +482,51 @@ class UniversalFacebookAdsServer {
   // }
 
   async executeToolCall({ toolName, args }) {
+    const user_id = this.user_id;
+
+    // Validate that user_id is provided
+    if (!user_id) {
+      throw new Error('Missing user_id in tool arguments');
+    }
 
     // Step 1: fetch token before the switch if needed
-    if (toolName.startsWith('facebook_') && toolName !== 'facebook_login' && toolName !== 'facebook_logout' && toolName !== 'facebook_check_auth') {
-      // await this.fetchFacebookAccessToken();
-      if (!this.facebookAccessToken) {
-        throw new Error('Facebook access token not found after fetch');
+    if (
+      toolName.startsWith('facebook_') &&
+      toolName !== 'facebook_login' &&
+      toolName !== 'facebook_logout' &&
+      toolName !== 'facebook_check_auth'
+    ) {
+      const token = this.facebookAccessTokens?.[user_id];
+
+      if (!token) {
+        throw new Error(`Facebook access token not found for user_id: ${user_id}`);
       }
+
+      // Store for use in tool execution
+      this.currentFacebookToken = token;
     }
+
+    // Step 2: tool switch
     switch (toolName) {
-      // case 'facebook_login':
-      //   return await facebookLogin(args);
-
-      // case 'facebook_logout':
-      //   return await facebookLogout(args);
-
-      // case 'facebook_check_auth':
-      //   return await facebookCheckAuth(args);
-
       case 'facebook_list_ad_accounts':
-        return await listAdAccounts(args, this.facebookAccessToken);
+        return await listAdAccounts(args, this.currentFacebookToken);
 
       case 'facebook_fetch_pagination_url':
-        return await fetchPaginationUrl(args, this.facebookAccessToken);
+        return await fetchPaginationUrl(args, this.currentFacebookToken);
 
       case 'facebook_get_details_of_ad_account':
-        return await getAccountDetails(args, this.facebookAccessToken);
+        return await getAccountDetails(args, this.currentFacebookToken);
 
       case 'facebook_get_adaccount_insights':
-        return await getAccountInsights(args, this.facebookAccessToken);
+        return await getAccountInsights(args, this.currentFacebookToken);
 
       case 'facebook_get_activities_by_adaccount':
-        return await getAccountActivities(args, this.facebookAccessToken);
+        return await getAccountActivities(args, this.currentFacebookToken);
 
       case 'facebook_get_ad_creatives':
-        return await getAdCreatives(args, this.facebookAccessToken);
+        return await getAdCreatives(args, this.currentFacebookToken);
 
       case 'facebook_get_ad_thumbnails':
-        // return await getAdThumbnailsEmbedded(args);
         throw new Error('get_ad_thumbnails_embedded tool is temporarily disabled');
 
       case '_list_tools':
