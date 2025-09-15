@@ -472,14 +472,14 @@ class UniversalFacebookAdsServer {
       }
     }
     switch (toolName) {
-      case 'facebook_login':
-        return await facebookLogin(args);
+      // case 'facebook_login':
+      //   return await facebookLogin(args);
 
-      case 'facebook_logout':
-        return await facebookLogout(args);
+      // case 'facebook_logout':
+      //   return await facebookLogout(args);
 
-      case 'facebook_check_auth':
-        return await facebookCheckAuth(args);
+      // case 'facebook_check_auth':
+      //   return await facebookCheckAuth(args);
 
       case 'facebook_list_ad_accounts':
         return await listAdAccounts(args, this.facebookAccessToken);
