@@ -31,7 +31,7 @@ import { CLAUDE_CONNECTOR_MANIFEST } from './claude-connector-manifest.js';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
-import puppeteer from 'puppeteer';
+import open from 'open';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -333,54 +333,28 @@ class UniversalFacebookAdsServer {
     const loginUrl = 'https://10xer-web-production.up.railway.app/login';
     const tokenUrl = 'https://10xer-web-production.up.railway.app/api/facebook/token';
 
-    const browser = await puppeteer.launch({ headless: true });
-    const page = await browser.newPage();
-
     try {
-      // 1) Open integrations URL
-      const response = await page.goto(integrationsUrl, { waitUntil: 'networkidle2' });
+      // 1) Open the integrations URL in the default browser
+      await open(integrationsUrl);
 
-      // 2) If not logged in (e.g. redirected to login page), navigate to login URL
-      if (response.url() === loginUrl) {
-        console.log('Not logged in, please login manually or automate login here');
+      // 2) Open the login URL in the default browser
+      await open(loginUrl);
 
-        // Optional: automate login here if you have credentials & selectors
-        // await page.type('input#username', 'your-username');
-        // await page.type('input#password', 'your-password');
-        // await page.click('button#login');
-        // await page.waitForNavigation({ waitUntil: 'networkidle2' });
+      // 3) Fetch the Facebook token now
+      const tokenRes = await fetch(tokenUrl);
+      if (!tokenRes.ok) {
+        throw new Error(`Facebook token fetch failed: ${tokenRes.status}`);
       }
 
-      // 3) Extract session cookies
-      const cookies = await page.cookies();
-      const sessionCookie = cookies.find(cookie => cookie.name === 'session');
-
-      if (!sessionCookie) {
-        throw new Error('Session cookie not found. Please login first.');
-      }
-
-      // 4) Use fetch to call token API with the session cookie attached
-      const tokenResponse = await fetch(tokenUrl, {
-        headers: {
-          Cookie: `session=${sessionCookie.value}`,
-        },
-      });
-
-      if (!tokenResponse.ok) {
-        throw new Error(`Facebook token fetch failed: ${tokenResponse.status}`);
-      }
-
-      const data = await tokenResponse.json();
+      const data = await tokenRes.json();
 
       if (data && data.success === true && typeof data.facebook_access_token === 'string') {
-        console.log('✅ Facebook access token fetched:', data.facebook_access_token.slice(0, 10) + '...');
-        await browser.close();
-        return data.facebook_access_token;
+        this.facebookAccessToken = data.facebook_access_token;
+        console.log('✅ Facebook access token fetched:', this.facebookAccessToken.slice(0, 10) + '...');
       } else {
         throw new Error('Facebook token not found or invalid in response');
       }
     } catch (err) {
-      await browser.close();
       throw err;
     }
   }
