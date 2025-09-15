@@ -67,41 +67,6 @@ class UniversalFacebookAdsServer {
     this.setupMCPHandlers();
   }
 
-  async fetchFacebookAccessToken() {
-    if (!this.apiKey) {
-      throw new Error('API key is not set');
-    }
-
-    const url = 'https://10xer-web-production.up.railway.app/mcp-api/facebook_token';
-
-    try {
-      const res = await fetch(url, {
-        headers: {
-          Authorization: `Bearer ${this.apiKey}`,
-        },
-      });
-
-      if (!res.ok) {
-        throw new Error(`Failed to fetch Facebook token: ${res.status}`);
-      }
-
-      const data = await res.json();
-
-      if (data.success && data.facebook_access_token) {
-        this.facebookAccessToken = data.facebook_access_token;
-        console.error(
-          '✅ Facebook access token fetched:',
-          this.facebookAccessToken.slice(0, 10) + '...'
-        );
-      } else {
-        throw new Error('Token not present in response');
-      }
-    } catch (err) {
-      console.error('❌ Error fetching Facebook token:', err.message);
-      throw err;
-    }
-  }
-
   setupApiServer() {
     this.apiServer.get('/mcp', async (req, res) => {
       try {
@@ -261,7 +226,80 @@ class UniversalFacebookAdsServer {
    * Execute tool call - REUSES ALL EXISTING LOGIC!
    * This is the core function that all protocols use
    */
+  // async executeToolCall({ toolName, args }) {
+  //   switch (toolName) {
+  //     case 'facebook_login':
+  //       return await facebookLogin(args);
+
+  //     case 'facebook_logout':
+  //       return await facebookLogout(args);
+
+  //     case 'facebook_check_auth':
+  //       return await facebookCheckAuth(args);
+
+  //     case 'facebook_list_ad_accounts':
+  //       return await listAdAccounts(args, this.facebookAccessToken);
+
+  //     case 'facebook_fetch_pagination_url':
+  //       return await fetchPaginationUrl(args, this.facebookAccessToken);
+
+  //     case 'facebook_get_details_of_ad_account':
+  //       return await getAccountDetails(args, this.facebookAccessToken);
+
+  //     case 'facebook_get_adaccount_insights':
+  //       return await getAccountInsights(args, this.facebookAccessToken);
+
+  //     case 'facebook_get_activities_by_adaccount':
+  //       return await getAccountActivities(args, this.facebookAccessToken);
+
+  //     case 'facebook_get_ad_creatives':
+  //       return await getAdCreatives(args, this.facebookAccessToken);
+
+  //     case 'facebook_get_ad_thumbnails':
+  //       // return await getAdThumbnailsEmbedded(args);
+  //       throw new Error('get_ad_thumbnails_embedded tool is temporarily disabled');
+
+  //     case '_list_tools':
+  //       return {
+  //         content: [{
+  //           type: 'text',
+  //           text: JSON.stringify(Object.keys(TOOL_SCHEMAS), null, 2)
+  //         }]
+  //       };
+
+  //     default:
+  //       throw new Error(`Unknown tool: ${toolName}`);
+  //   }
+  // }
+
   async executeToolCall({ toolName, args }) {
+    // Only tools that require the Facebook access token
+    const toolsRequiringToken = [
+      'facebook_list_ad_accounts',
+      'facebook_fetch_pagination_url',
+      'facebook_get_details_of_ad_account',
+      'facebook_get_adaccount_insights',
+      'facebook_get_activities_by_adaccount',
+      'facebook_get_ad_creatives',
+      'facebook_get_ad_thumbnails'
+    ];
+
+    // Fetch the token if needed
+    if (toolsRequiringToken.includes(toolName) && !this.facebookAccessToken) {
+      console.log(`ℹ️ Token required for "${toolName}", fetching Facebook token...`);
+      try {
+        await this.fetchFacebookAccessTokenIfIntegrationOK();
+      } catch (error) {
+        console.error('❌ Failed to fetch Facebook token:', error);
+        throw new Error('Facebook token fetch failed. Please authenticate via the connector.');
+      }
+
+      if (!this.facebookAccessToken) {
+        throw new Error('Facebook access token not found after fetch');
+      }
+    }
+
+    // Proceed with tool execution
     switch (toolName) {
       case 'facebook_login':
         return await facebookLogin(args);
@@ -291,7 +329,6 @@ class UniversalFacebookAdsServer {
         return await getAdCreatives(args, this.facebookAccessToken);
 
       case 'facebook_get_ad_thumbnails':
-        // return await getAdThumbnailsEmbedded(args);
         throw new Error('get_ad_thumbnails_embedded tool is temporarily disabled');
 
       case '_list_tools':
@@ -361,11 +398,13 @@ class UniversalFacebookAdsServer {
 
   async startMCP() {
     try {
-      await this.fetchFacebookAccessTokenIfIntegrationOK(); // New call
+      console.log('🔄 Connecting MCP server via stdio...');
 
       const transport = new StdioServerTransport();
       await this.mcpServer.connect(transport);
-      console.error('Facebook Ads MCP server running on stdio');
+
+      console.log('✅ MCP server connected on stdio');
+
     } catch (err) {
       console.error('❌ Failed during MCP startup:', err.message);
       throw err;
