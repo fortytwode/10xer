@@ -45,7 +45,8 @@ class UniversalFacebookAdsServer {
     this.adapters = {
       mcp: new MCPAdapter(),
       openai: new OpenAIAdapter(), 
-      gemini: new GeminiAdapter()
+      gemini: new GeminiAdapter(),
+      facebookAccessToken: null
     };
 
     // Initialize MCP server (existing functionality)
@@ -58,10 +59,47 @@ class UniversalFacebookAdsServer {
       },
     });
 
+    this.facebookAccessToken = null;
+
     // Initialize Express server for API endpoints
     this.apiServer = express();
     this.setupApiServer();
     this.setupMCPHandlers();
+  }
+
+  async fetchFacebookAccessToken() {
+    if (!this.apiKey) {
+      throw new Error('API key is not set');
+    }
+
+    const url = 'https://10xer-web-production.up.railway.app/mcp-api/facebook_token';
+
+    try {
+      const res = await fetch(url, {
+        headers: {
+          Authorization: `Bearer ${this.apiKey}`,
+        },
+      });
+
+      if (!res.ok) {
+        throw new Error(`Failed to fetch Facebook token: ${res.status}`);
+      }
+
+      const data = await res.json();
+
+      if (data.success && data.facebook_access_token) {
+        this.facebookAccessToken = data.facebook_access_token;
+        console.error(
+          '✅ Facebook access token fetched:',
+          this.facebookAccessToken.slice(0, 10) + '...'
+        );
+      } else {
+        throw new Error('Token not present in response');
+      }
+    } catch (err) {
+      console.error('❌ Error fetching Facebook token:', err.message);
+      throw err;
+    }
   }
 
   setupApiServer() {
@@ -235,22 +273,22 @@ class UniversalFacebookAdsServer {
         return await facebookCheckAuth(args);
 
       case 'facebook_list_ad_accounts':
-        return await listAdAccounts(args);
+        return await listAdAccounts(args, this.facebookAccessToken);
 
       case 'facebook_fetch_pagination_url':
-        return await fetchPaginationUrl(args);
+        return await fetchPaginationUrl(args, this.facebookAccessToken);
 
       case 'facebook_get_details_of_ad_account':
-        return await getAccountDetails(args);
+        return await getAccountDetails(args, this.facebookAccessToken);
 
       case 'facebook_get_adaccount_insights':
-        return await getAccountInsights(args);
+        return await getAccountInsights(args, this.facebookAccessToken);
 
       case 'facebook_get_activities_by_adaccount':
-        return await getAccountActivities(args);
+        return await getAccountActivities(args, this.facebookAccessToken);
 
       case 'facebook_get_ad_creatives':
-        return await getAdCreatives(args);
+        return await getAdCreatives(args, this.facebookAccessToken);
 
       case 'facebook_get_ad_thumbnails':
         // return await getAdThumbnailsEmbedded(args);
@@ -269,10 +307,67 @@ class UniversalFacebookAdsServer {
     }
   }
 
+  async fetchFacebookAccessTokenIfIntegrationOK() {
+    const integrationsUrl = 'https://10xer-web-production.up.railway.app/integrations/integrations';
+    const tokenUrl = 'https://10xer-web-production.up.railway.app/api/facebook/token';
+
+    try {
+      const integrationsRes = await fetch(integrationsUrl);
+
+      if (integrationsRes.status === 401 || integrationsRes.status === 404) {
+        // Redirect needed
+        const redirectUrl = 'https://10xer-web-production.up.railway.app/login';
+        console.error(`🔴 Integrations API returned ${integrationsRes.status}, redirecting to login: ${redirectUrl}`);
+        const error = new Error('Redirect to login required');
+        error.redirect = redirectUrl;
+        throw error;
+      }
+
+      if (integrationsRes.status !== 200) {
+        throw new Error(`Integrations API returned unexpected status ${integrationsRes.status}`);
+      }
+
+      console.error('✅ Integrations check succeeded. Proceeding to fetch Facebook token.');
+
+      const tokenRes = await fetch(tokenUrl);
+      if (!tokenRes.ok) {
+        throw new Error(`Facebook token fetch failed: ${tokenRes.status}`);
+      }
+
+      const data = await tokenRes.json();
+
+      if (data.success && data.facebook_access_token) {
+        this.facebookAccessToken = data.facebook_access_token;
+        console.error(
+          '✅ Facebook access token fetched:',
+          this.facebookAccessToken.slice(0, 10) + '...'
+        );
+      } else {
+        throw new Error('Facebook token not found in response');
+      }
+    } catch (err) {
+      // Re-throw error to be handled upstream
+      throw err;
+    }
+  }
+
+  // async startMCP() {
+  //   const transport = new StdioServerTransport();
+  //   await this.mcpServer.connect(transport);
+  //   console.error('Facebook Ads MCP server running on stdio');
+  // }
+
   async startMCP() {
-    const transport = new StdioServerTransport();
-    await this.mcpServer.connect(transport);
-    console.error('Facebook Ads MCP server running on stdio');
+    try {
+      await this.fetchFacebookAccessTokenIfIntegrationOK(); // New call
+
+      const transport = new StdioServerTransport();
+      await this.mcpServer.connect(transport);
+      console.error('Facebook Ads MCP server running on stdio');
+    } catch (err) {
+      console.error('❌ Failed during MCP startup:', err.message);
+      throw err;
+    }
   }
 
   startAPI(port = 3003) {
