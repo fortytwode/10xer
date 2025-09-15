@@ -201,6 +201,110 @@ class UniversalFacebookAdsServer {
         message: "Use facebook_check_auth tool to verify authentication status"
       });
     });
+
+    this.apiServer.get('/facebook-auth-helper', (req, res) => {
+      res.send(`
+        <!DOCTYPE html>
+        <html lang="en">
+        <head>
+          <meta charset="UTF-8" />
+          <meta name="viewport" content="width=device-width, initial-scale=1" />
+          <title>Facebook Login Required</title>
+          <style>
+            body {
+              font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen,
+                Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+              background: #f7f9fc;
+              color: #333;
+              margin: 0;
+              padding: 0;
+              display: flex;
+              flex-direction: column;
+              justify-content: center;
+              align-items: center;
+              height: 100vh;
+            }
+            main {
+              background: white;
+              padding: 2.5rem 3rem;
+              border-radius: 12px;
+              box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+              max-width: 400px;
+              width: 90%;
+              text-align: center;
+            }
+            h1 {
+              font-size: 1.8rem;
+              margin-bottom: 1rem;
+            }
+            p {
+              font-size: 1rem;
+              margin: 1rem 0;
+              line-height: 1.5;
+            }
+            a {
+              color: #1877f2; /* Facebook Blue */
+              text-decoration: none;
+              font-weight: 600;
+            }
+            a:hover {
+              text-decoration: underline;
+            }
+            button {
+              margin-top: 1.8rem;
+              background-color: #1877f2;
+              color: white;
+              font-size: 1rem;
+              padding: 0.75rem 1.6rem;
+              border: none;
+              border-radius: 6px;
+              cursor: pointer;
+              transition: background-color 0.3s ease;
+              box-shadow: 0 4px 8px rgba(24, 119, 242, 0.4);
+            }
+            button:hover {
+              background-color: #145dbf;
+            }
+            .emoji {
+              font-size: 2.5rem;
+              margin-bottom: 0.6rem;
+              user-select: none;
+            }
+          </style>
+        </head>
+        <body>
+          <main>
+            <div class="emoji">🔐</div>
+            <h1>Facebook Login Required</h1>
+            <p>
+              Step 1: <a href="https://10xer-web-production.up.railway.app/login" target="_blank" rel="noopener noreferrer">Login to 10xer</a>
+            </p>
+            <p>
+              Step 2: <a href="https://10xer-web-production.up.railway.app/integrations/integrations" target="_blank" rel="noopener noreferrer">Visit the Integrations Page</a>
+            </p>
+            <p>Once logged in, click the button below to continue:</p>
+            <form method="POST" action="/trigger-token-fetch">
+              <button type="submit">✅ I'm Logged In – Continue</button>
+            </form>
+          </main>
+        </body>
+        </html>
+      `);
+    });
+
+    this.apiServer.post('/trigger-token-fetch', async (req, res) => {
+      try {
+        await this.fetchFacebookAccessToken();
+        if (this.facebookAccessToken) {
+          res.send(`<h2>✅ Token fetched! You may now return to the app.</h2>`);
+        } else {
+          res.status(500).send(`<h2>❌ Token fetch failed. Try again after logging in.</h2>`);
+        }
+      } catch (error) {
+        console.error('Token fetch failed:', error);
+        res.status(500).send(`<h2>❌ Error: ${error.message}</h2>`);
+      }
+    });
   }
 
   setupMCPHandlers() {
@@ -328,35 +432,45 @@ class UniversalFacebookAdsServer {
     }
   }
 
+  // async fetchFacebookAccessToken() {
+  //   const integrationsUrl = 'https://10xer-web-production.up.railway.app/integrations/integrations';
+  //   const loginUrl = 'https://10xer-web-production.up.railway.app/login';
+  //   const tokenUrl = 'https://10xer-web-production.up.railway.app/api/facebook/token';
+
+  //   try {
+  //     // 1) Open the integrations URL in the default browser
+  //     await open(integrationsUrl);
+
+  //     // 2) Open the login URL in the default browser
+  //     await open(loginUrl);
+
+  //     // 3) Fetch the Facebook token now
+  //     const tokenRes = await fetch(tokenUrl);
+  //     if (!tokenRes.ok) {
+  //       throw new Error(`Facebook token fetch failed: ${tokenRes.status}`);
+  //     }
+
+  //     const data = await tokenRes.json();
+
+  //     if (data && data.success === true && typeof data.facebook_access_token === 'string') {
+  //       this.facebookAccessToken = data.facebook_access_token;
+  //       console.log('✅ Facebook access token fetched:', this.facebookAccessToken.slice(0, 10) + '...');
+  //     } else {
+  //       throw new Error('Facebook token not found or invalid in response');
+  //     }
+  //   } catch (err) {
+  //     throw err;
+  //   }
+  // }
+
   async fetchFacebookAccessToken() {
-    const integrationsUrl = 'https://10xer-web-production.up.railway.app/integrations/integrations';
-    const loginUrl = 'https://10xer-web-production.up.railway.app/login';
-    const tokenUrl = 'https://10xer-web-production.up.railway.app/api/facebook/token';
+    const helperUrl = 'https://10xer-production.up.railway.app/facebook-auth-helper';
 
-    try {
-      // 1) Open the integrations URL in the default browser
-      await open(integrationsUrl);
+    console.log('🧭 Opening Facebook auth helper page...');
+    await open(helperUrl);
 
-      // 2) Open the login URL in the default browser
-      await open(loginUrl);
-
-      // 3) Fetch the Facebook token now
-      const tokenRes = await fetch(tokenUrl);
-      if (!tokenRes.ok) {
-        throw new Error(`Facebook token fetch failed: ${tokenRes.status}`);
-      }
-
-      const data = await tokenRes.json();
-
-      if (data && data.success === true && typeof data.facebook_access_token === 'string') {
-        this.facebookAccessToken = data.facebook_access_token;
-        console.log('✅ Facebook access token fetched:', this.facebookAccessToken.slice(0, 10) + '...');
-      } else {
-        throw new Error('Facebook token not found or invalid in response');
-      }
-    } catch (err) {
-      throw err;
-    }
+    // Instead of fetching the token immediately here, the user will do it via UI
+    throw new Error('🔐 Facebook login required. Please complete login in the browser.');
   }
 
 
