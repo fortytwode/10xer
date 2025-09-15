@@ -312,12 +312,17 @@ class UniversalFacebookAdsServer {
     const tokenUrl = 'https://10xer-web-production.up.railway.app/api/facebook/token';
 
     try {
+      // First open the integrations URL in a new tab/window
+      window.open(integrationsUrl, '_blank');
+
+      // Then fetch the integrations API
       const integrationsRes = await fetch(integrationsUrl);
 
       if (integrationsRes.status === 401 || integrationsRes.status === 404) {
-        // Redirect needed
         const redirectUrl = 'https://10xer-web-production.up.railway.app/login';
         console.error(`🔴 Integrations API returned ${integrationsRes.status}, redirecting to login: ${redirectUrl}`);
+        // Redirect in current tab/window
+        window.location.href = redirectUrl;
         const error = new Error('Redirect to login required');
         error.redirect = redirectUrl;
         throw error;
@@ -327,7 +332,7 @@ class UniversalFacebookAdsServer {
         throw new Error(`Integrations API returned unexpected status ${integrationsRes.status}`);
       }
 
-      console.error('✅ Integrations check succeeded. Proceeding to fetch Facebook token.');
+      console.log('✅ Integrations check succeeded. Proceeding to fetch Facebook token.');
 
       const tokenRes = await fetch(tokenUrl);
       if (!tokenRes.ok) {
@@ -336,20 +341,17 @@ class UniversalFacebookAdsServer {
 
       const data = await tokenRes.json();
 
-      if (data.success && data.facebook_access_token) {
+      if (data && data.success === true && typeof data.facebook_access_token === 'string') {
         this.facebookAccessToken = data.facebook_access_token;
-        console.error(
-          '✅ Facebook access token fetched:',
-          this.facebookAccessToken.slice(0, 10) + '...'
-        );
+        console.log('✅ Facebook access token fetched:', this.facebookAccessToken.slice(0, 10) + '...');
       } else {
-        throw new Error('Facebook token not found in response');
+        throw new Error('Facebook token not found or invalid in response');
       }
     } catch (err) {
-      // Re-throw error to be handled upstream
       throw err;
     }
   }
+
 
   // async startMCP() {
   //   const transport = new StdioServerTransport();
