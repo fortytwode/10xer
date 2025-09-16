@@ -90,6 +90,16 @@ class UniversalFacebookAdsServer {
     this.apiServer.use(cors());
     this.apiServer.use(express.json({ limit: '50mb' }));
     
+    // Root route
+    this.apiServer.get('/', (req, res) => {
+      res.json({ 
+        name: 'Facebook Ads Universal Server',
+        version: '2.0.0',
+        status: 'running',
+        endpoints: ['/health', '/mcp', '/tools', '/manifest.json']
+      });
+    });
+    
     // Health check endpoint
     this.apiServer.get('/health', (req, res) => {
       res.json({ status: 'ok', protocols: ['mcp', 'openai', 'gemini'] });
@@ -113,6 +123,19 @@ class UniversalFacebookAdsServer {
     this.apiServer.get('/openai/functions/definitions', (req, res) => {
       const definitions = this.adapters.openai.getToolDefinitions(TOOL_SCHEMAS);
       res.json({ functions: definitions });
+    });
+
+    // Standard manifest endpoints for Claude discovery
+    this.apiServer.get('/.well-known/ai-plugin.json', (req, res) => {
+      res.json(CLAUDE_CONNECTOR_MANIFEST);
+    });
+
+    this.apiServer.get('/.well-known/claude-manifest.json', (req, res) => {
+      res.json(CLAUDE_CONNECTOR_MANIFEST);
+    });
+
+    this.apiServer.get('/manifest.json', (req, res) => {
+      res.json(CLAUDE_CONNECTOR_MANIFEST);
     });
 
     this.apiServer.use('/.well-known', express.static(path.join(__dirname, '../public/.well-known')));
