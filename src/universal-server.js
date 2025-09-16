@@ -72,30 +72,20 @@ class UniversalFacebookAdsServer {
   }
 
   setupApiServer() {
-    this.apiServer.get('/mcp', async (req, res) => {
-      try {
-        this.activeSseTransport = new SSEServerTransport('/mcp', res);
-        await this.mcpServer.connect(this.activeSseTransport);
-      } catch (err) {
+    this.apiServer.get('/mcp', (req, res) => {
+      const sseTransport = new SSEServerTransport('/mcp', res);
+      this.mcpServer.connect(sseTransport).catch(err => {
         console.error('SSE connection error:', err);
-        if (!res.headersSent) {
-          res.status(500).send('MCP connection failed');
-        }
-      }
+        res.status(500).send('MCP connection failed');
+      });
     });
 
-    this.apiServer.post('/mcp', async (req, res) => {
-      try {
-        if (!this.activeSseTransport) {
-          throw new Error('SSE connection not established');
-        }
-        await this.activeSseTransport.handlePostMessage(req, res);
-      } catch (err) {
-        console.error('SSE POST error:', err);
-        if (!res.headersSent) {
-          res.status(500).send('MCP POST failed');
-        }
-      }
+    this.apiServer.post('/mcp', (req, res) => {
+      const sseTransport = new SSEServerTransport('/mcp', res);
+      this.mcpServer.connect(sseTransport).catch(err => {
+        console.error('SSE connection error:', err);
+        res.status(500).send('MCP connection failed');
+      });
     });
     this.apiServer.use(cors());
     this.apiServer.use(express.json({ limit: '50mb' }));
@@ -482,30 +472,6 @@ class UniversalFacebookAdsServer {
   // }
 
   async executeToolCall({ toolName, args }) {
-    const user_id = this.user_id;
-
-    // Validate that user_id is provided
-    if (!user_id) {
-      throw new Error('Missing user_id in tool arguments');
-    }
-
-    // Step 1: fetch token before the switch if needed
-    if (
-      toolName.startsWith('facebook_') &&
-      toolName !== 'facebook_login' &&
-      toolName !== 'facebook_logout' &&
-      toolName !== 'facebook_check_auth'
-    ) {
-      const token = this.facebookAccessTokens?.[user_id];
-
-      if (!token) {
-        throw new Error(`Facebook access token not found for user_id: ${user_id}`);
-      }
-
-      // Store for use in tool execution
-      this.currentFacebookToken = token;
-    }
-
     // Step 2: tool switch
     switch (toolName) {
       case 'facebook_login':
