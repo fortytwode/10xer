@@ -3,16 +3,10 @@ export const CLAUDE_CONNECTOR_MANIFEST = {
   "description": "Access your Meta Ad Accounts, insights, creatives, and performance data directly in Claude.",
   "version": "1.0.0",
   "connection": {
-    "type": "oauth2",
-    "authorization_url": "https://10xer-production.up.railway.app/mcp/start-auth/",
-    "token_url": "https://10xer-production.up.railway.app/mcp/auth-status/",
-    "scopes": ["ads_read", "ads_management", "business_management"]
+    "type": "none"
   },
   "api": {
-    "base_url": "https://10xer-production.up.railway.app",
-    "authentication": {
-      "type": "oauth2_bearer"
-    }
+    "base_url": "https://10xer-production.up.railway.app"
   },
   "tools": [
     {
