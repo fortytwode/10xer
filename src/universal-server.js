@@ -543,6 +543,8 @@ class UniversalFacebookAdsServer {
   // }
 
   async executeToolCall({ toolName, args }) {
+    console.error("args->", args)
+    console.error("args?.user_id->", args?.user_id)
     await this.fetchFacebookAccessToken(this.user_id)
     console.error("this.currentFacebookAccessToken->", this.currentFacebookAccessToken);
     // Step 2: tool switch
