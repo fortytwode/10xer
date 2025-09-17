@@ -270,7 +270,7 @@ class UniversalFacebookAdsServer {
             jsonrpc: "2.0",
             id: request.id,
             result: {
-              protocolVersion: "2024-11-05",
+              protocolVersion: "2025-06-18",
               capabilities: {
                 tools: {}
               },
@@ -280,6 +280,10 @@ class UniversalFacebookAdsServer {
               }
             }
           });
+        } else if (request.method === 'notifications/initialized') {
+          // Claude.ai sends this after initialization - acknowledge it
+          console.log('✅ Claude.ai initialization notification received');
+          res.status(200).end();
         } else if (request.method === 'tools/list') {
           const tools = this.adapters.mcp.getToolDefinitions(TOOL_SCHEMAS);
           res.json({
@@ -314,6 +318,59 @@ class UniversalFacebookAdsServer {
       }
     });
 
+    // MCP GET endpoint for SSE connection (Claude.ai expects this)
+    this.apiServer.get('/mcp', async (req, res) => {
+      try {
+        const transport = new SSEServerTransport('/mcp', res);
+        await transport.start();
+        
+        transport.onmessage = async (message) => {
+          try {
+            if (message.method === 'initialize') {
+              await transport.send({
+                jsonrpc: "2.0",
+                id: message.id,
+                result: {
+                  protocolVersion: "2025-06-18",
+                  capabilities: { tools: {} },
+                  serverInfo: { name: "facebook-ads-universal", version: "2.0.0" }
+                }
+              });
+            } else if (message.method === 'tools/list') {
+              const tools = this.adapters.mcp.getToolDefinitions(TOOL_SCHEMAS);
+              await transport.send({
+                jsonrpc: "2.0",
+                id: message.id,
+                result: { tools }
+              });
+            } else if (message.method === 'tools/call') {
+              const result = await this.executeToolCall({
+                toolName: message.params.name,
+                args: message.params.arguments || {}
+              });
+              await transport.send({
+                jsonrpc: "2.0",
+                id: message.id,
+                result: { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] }
+              });
+            } else if (message.method === 'notifications/initialized') {
+              // Claude.ai sends this after initialization - acknowledge it
+              console.log('✅ Claude.ai initialization notification received');
+            }
+          } catch (err) {
+            await transport.send({
+              jsonrpc: "2.0",
+              id: message.id,
+              error: { code: -32603, message: err.message }
+            });
+          }
+        };
+      } catch (err) {
+        console.error('SSE setup error:', err);
+        res.status(500).end();
+      }
+    });
+
     // MCP SSE endpoint for Claude.ai connectors  
     this.apiServer.get('/mcp/sse', async (req, res) => {
       try {
@@ -327,7 +384,7 @@ class UniversalFacebookAdsServer {
                 jsonrpc: "2.0",
                 id: message.id,
                 result: {
-                  protocolVersion: "2024-11-05",
+                  protocolVersion: "2025-06-18",
                   capabilities: { tools: {} },
                   serverInfo: { name: "facebook-ads-universal", version: "2.0.0" }
                 }
