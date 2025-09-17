@@ -118,6 +118,31 @@ class UniversalFacebookAdsServer {
     this.apiServer.use(cors());
     this.apiServer.use(express.json({ limit: '50mb' }));
     
+    // 🔍 CLAUDE.AI REQUEST LOGGER - Capture all requests for debugging
+    this.apiServer.use((req, res, next) => {
+      const timestamp = new Date().toISOString();
+      const userAgent = req.get('User-Agent') || 'unknown';
+      
+      console.log(`\n🔍 [${timestamp}] ${req.method} ${req.path}`);
+      console.log(`🔍 User-Agent: ${userAgent}`);
+      console.log(`🔍 Headers:`, JSON.stringify(req.headers, null, 2));
+      
+      if (req.body && Object.keys(req.body).length > 0) {
+        console.log(`🔍 Body:`, JSON.stringify(req.body, null, 2));
+      }
+      
+      // Log Claude.ai specific requests
+      if (userAgent.toLowerCase().includes('claude') || 
+          userAgent.toLowerCase().includes('anthropic') ||
+          req.path.includes('mcp') || 
+          req.path.includes('manifest') ||
+          req.path.includes('well-known')) {
+        console.log(`🚨 POTENTIAL CLAUDE.AI REQUEST DETECTED! 🚨`);
+      }
+      
+      next();
+    });
+    
     // Root route
     this.apiServer.get('/', (req, res) => {
       res.json({ 
