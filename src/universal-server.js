@@ -74,27 +74,44 @@ class UniversalFacebookAdsServer {
   }
 
   async fetchFacebookAccessToken(userId) {
-    // For Claude.ai compatibility, use demo/default user when no userId provided
-    const effectiveUserId = userId || 'demo_user';
-    const url = `https://10xer-web-production.up.railway.app/mcp-api/facebook_token_by_user?userId=${effectiveUserId}`;
-    try {
-      const res = await fetch(url);
-
-      if (!res.ok) {
-        throw new Error(`Failed to fetch Facebook token: ${res.status}`);
-      }
-
-      const data = await res.json();
-      if (data.success && data.facebook_access_token) {
-        this.currentFacebookAccessToken = data.facebook_access_token;
-        console.error('✅ Facebook access token fetched:', this.currentFacebookAccessToken.slice(0, 10) + '...');
-      } else {
-        throw new Error('Token not present in response');
-      }
-    } catch (err) {
-      console.error('❌ Error fetching Facebook token:', err.message);
-      throw err;
+    // For Claude.ai compatibility, use environment variable when no user auth available
+    if (!userId && process.env.FACEBOOK_ACCESS_TOKEN) {
+      this.currentFacebookAccessToken = process.env.FACEBOOK_ACCESS_TOKEN;
+      console.error('✅ Using environment Facebook access token');
+      return;
     }
+
+    // Try to fetch user-specific token from external API
+    if (userId) {
+      const url = `https://10xer-web-production.up.railway.app/mcp-api/facebook_token_by_user?userId=${userId}`;
+      try {
+        const res = await fetch(url);
+
+        if (!res.ok) {
+          throw new Error(`Failed to fetch Facebook token: ${res.status}`);
+        }
+
+        const data = await res.json();
+        if (data.success && data.facebook_access_token) {
+          this.currentFacebookAccessToken = data.facebook_access_token;
+          console.error('✅ Facebook access token fetched:', this.currentFacebookAccessToken.slice(0, 10) + '...');
+          return;
+        } else {
+          throw new Error('Token not present in response');
+        }
+      } catch (err) {
+        console.error('❌ Error fetching Facebook token:', err.message);
+        // Fall back to environment token if available
+        if (process.env.FACEBOOK_ACCESS_TOKEN) {
+          this.currentFacebookAccessToken = process.env.FACEBOOK_ACCESS_TOKEN;
+          console.error('✅ Falling back to environment Facebook access token');
+          return;
+        }
+        throw err;
+      }
+    }
+
+    throw new Error('No Facebook access token available');
   }
 
   setupApiServer() {
@@ -648,18 +665,24 @@ class UniversalFacebookAdsServer {
   async executeToolCall({ toolName, args }) {
     console.error("args->", args)
     console.error("args?.user_id->", args?.user_id)
-    await this.fetchFacebookAccessToken(this.user_id || 'demo_user')
-    console.error("this.currentFacebookAccessToken->", this.currentFacebookAccessToken);
+    
+    // Only fetch Facebook token for tools that need it (not auth tools)
+    const authTools = ['facebook_login', 'facebook_logout', 'facebook_check_auth'];
+    if (!authTools.includes(toolName)) {
+      await this.fetchFacebookAccessToken(this.user_id)
+      console.error("this.currentFacebookAccessToken->", this.currentFacebookAccessToken);
+    }
+    
     // Step 2: tool switch
     switch (toolName) {
-      // case 'facebook_login':
-      //   return await facebookLogin(args);
+      case 'facebook_login':
+        return await facebookLogin(args);
 
-      // case 'facebook_logout':
-      // return await facebookLogout(args);
+      case 'facebook_logout':
+        return await facebookLogout(args);
 
-      // case 'facebook_check_auth':
-      //   return await facebookCheckAuth(args);
+      case 'facebook_check_auth':
+        return await facebookCheckAuth(args);
       
       case 'facebook_list_ad_accounts':
         return await listAdAccounts(args, this.currentFacebookAccessToken);

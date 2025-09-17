@@ -10,6 +10,17 @@ export const CLAUDE_CONNECTOR_MANIFEST = {
   },
   "tools": [
     {
+      "name": "facebook_login",
+      "description": "Login to Facebook using OAuth to authenticate and access ad accounts",
+      "method": "POST",
+      "endpoint": "/tools/facebook_login",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": []
+      }
+    },
+    {
       "name": "facebook_list_ad_accounts",
       "description": "List all Facebook ad accounts accessible to the authenticated user",
       "method": "POST",
