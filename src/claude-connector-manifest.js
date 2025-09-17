@@ -1,5 +1,5 @@
 export const CLAUDE_CONNECTOR_MANIFEST = {
-  "name": "rocketship-meta-ads-connector",
+  "name": "10xer",
   "description": "Access your Meta Ad Accounts, insights, creatives, and performance data directly in Claude.",
   "version": "1.0.0",
   "connection": {
