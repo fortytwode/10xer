@@ -215,52 +215,58 @@ class UniversalFacebookAdsServer {
       res.json({ tools });
     });
 
-    // MCP SSE endpoints for Claude connector
-    this.apiServer.get('/mcp', async (req, res) => {
-      try {
-        const sseTransport = new SSEServerTransport('/mcp', res);
-        
-        // Store transport by session ID for POST requests
-        if (!this.sseTransports) {
-          this.sseTransports = new Map();
-        }
-        this.sseTransports.set(sseTransport.sessionId, sseTransport);
-        
-        await this.mcpServer.connect(sseTransport);
-        
-        // Override the MCP SDK's close handler to keep session alive
-        const originalOnClose = sseTransport.onclose;
-        sseTransport.onclose = () => {
-          // Don't delete session - keep it for subsequent POST requests
-          console.log('SSE connection closed but keeping session alive:', sseTransport.sessionId);
-          if (originalOnClose) originalOnClose();
-        };
-      } catch (err) {
-        console.error('SSE connection error:', err);
-        if (!res.headersSent) {
-          res.status(500).send('MCP connection failed');
-        }
-      }
-    });
-
+    // MCP Streamable HTTP endpoint for Claude connector (new standard)
     this.apiServer.post('/mcp', async (req, res) => {
       try {
-        const sessionId = req.query.sessionId;
-        if (!sessionId) {
-          throw new Error('Session ID required in POST request');
-        }
+        // Handle MCP requests directly via HTTP (no SSE needed)
+        const request = req.body;
         
-        if (!this.sseTransports || !this.sseTransports.has(sessionId)) {
-          throw new Error('SSE connection not found for session');
+        if (request.method === 'initialize') {
+          res.json({
+            jsonrpc: "2.0",
+            id: request.id,
+            result: {
+              protocolVersion: "2024-11-05",
+              capabilities: {
+                tools: {}
+              },
+              serverInfo: {
+                name: "facebook-ads-universal",
+                version: "2.0.0"
+              }
+            }
+          });
+        } else if (request.method === 'tools/list') {
+          const tools = this.adapters.mcp.getToolDefinitions(TOOL_SCHEMAS);
+          res.json({
+            jsonrpc: "2.0", 
+            id: request.id,
+            result: { tools }
+          });
+        } else if (request.method === 'tools/call') {
+          const result = await this.executeToolCall({
+            toolName: request.params.name,
+            args: request.params.arguments || {}
+          });
+          res.json({
+            jsonrpc: "2.0",
+            id: request.id, 
+            result: { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] }
+          });
+        } else {
+          res.status(400).json({
+            jsonrpc: "2.0",
+            id: request.id,
+            error: { code: -32601, message: "Method not found" }
+          });
         }
-        
-        const sseTransport = this.sseTransports.get(sessionId);
-        await sseTransport.handlePostMessage(req, res);
       } catch (err) {
-        console.error('SSE POST error:', err);
-        if (!res.headersSent) {
-          res.status(500).json({ error: `MCP POST failed: ${err.message}` });
-        }
+        console.error('MCP error:', err);
+        res.status(500).json({
+          jsonrpc: "2.0", 
+          id: req.body?.id,
+          error: { code: -32603, message: err.message }
+        });
       }
     });
 
