@@ -57,7 +57,7 @@ export const CLAUDE_CONNECTOR_MANIFEST = {
       "name": "facebook_get_adaccount_insights", 
       "description": "Get performance insights and metrics for ad accounts, campaigns, adsets, or individual ads",
       "method": "POST",
-      "endpoint": "/mcpget_adaccount_insights",
+      "endpoint": "/mcpadaccount_insights",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -114,7 +114,7 @@ export const CLAUDE_CONNECTOR_MANIFEST = {
       "name": "facebook_get_ad_creatives",
       "description": "Get creative assets and performance data for ads including images, videos, and ad copy", 
       "method": "POST",
-      "endpoint": "/mcpget_ad_creatives",
+      "endpoint": "/mcpad_creatives",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -136,7 +136,7 @@ export const CLAUDE_CONNECTOR_MANIFEST = {
       "name": "facebook_get_activities_by_adaccount",
       "description": "Get activity logs and change history for a specific ad account",
       "method": "POST",
-      "endpoint": "/mcpget_activities_by_adaccount", 
+      "endpoint": "/mcpactivities_by_adaccount", 
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -166,7 +166,7 @@ export const CLAUDE_CONNECTOR_MANIFEST = {
       "name": "facebook_get_campaign_details",
       "description": "Get detailed information about a specific campaign",
       "method": "POST",
-      "endpoint": "/mcpget_campaign_details",
+      "endpoint": "/mcpcampaign_details",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -188,7 +188,7 @@ export const CLAUDE_CONNECTOR_MANIFEST = {
       "name": "facebook_get_adset_details",
       "description": "Get detailed information about a specific ad set including targeting and budget",
       "method": "POST",
-      "endpoint": "/mcpget_adset_details",
+      "endpoint": "/mcpadset_details",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -210,7 +210,7 @@ export const CLAUDE_CONNECTOR_MANIFEST = {
       "name": "facebook_get_creative_asset_url_by_ad_id",
       "description": "Get creative asset URLs and details for a specific ad including images, videos, and ad copy",
       "method": "POST",
-      "endpoint": "/mcpget_creative_asset_url_by_ad_id",
+      "endpoint": "/mcpcreative_asset_url_by_ad_id",
       "inputSchema": {
         "type": "object",
         "properties": {
