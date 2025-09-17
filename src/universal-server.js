@@ -226,10 +226,15 @@ class UniversalFacebookAdsServer {
         }
         this.sseTransports.set(sseTransport.sessionId, sseTransport);
         
-        // Keep session alive for Claude.ai initialization
-        // Don't delete session on connection close - let it timeout instead
-        
         await this.mcpServer.connect(sseTransport);
+        
+        // Override the MCP SDK's close handler to keep session alive
+        const originalOnClose = sseTransport.onclose;
+        sseTransport.onclose = () => {
+          // Don't delete session - keep it for subsequent POST requests
+          console.log('SSE connection closed but keeping session alive:', sseTransport.sessionId);
+          if (originalOnClose) originalOnClose();
+        };
       } catch (err) {
         console.error('SSE connection error:', err);
         if (!res.headersSent) {
