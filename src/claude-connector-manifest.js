@@ -6,7 +6,7 @@ export const CLAUDE_CONNECTOR_MANIFEST = {
     "type": "none"
   },
   "api": {
-    "base_url": "https://10xer-production.up.railway.app/mcp/sse"
+    "base_url": "https://10xer-production.up.railway.app"
   },
   "tools": [
     {
