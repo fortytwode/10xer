@@ -85,7 +85,7 @@ class UniversalFacebookAdsServer {
       const data = await res.json();
       if (data.success && data.facebook_access_token) {
         this.currentFacebookAccessToken = data.facebook_access_token;
-        console.error('✅ Facebook access token fetched:', this.facebookAccessToken.slice(0, 10) + '...');
+        console.error('✅ Facebook access token fetched:', this.currentFacebookAccessToken.slice(0, 10) + '...');
       } else {
         throw new Error('Token not present in response');
       }
