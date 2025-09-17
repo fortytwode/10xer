@@ -226,12 +226,8 @@ class UniversalFacebookAdsServer {
         }
         this.sseTransports.set(sseTransport.sessionId, sseTransport);
         
-        // Clean up when connection closes
-        const originalOnClose = sseTransport.onclose;
-        sseTransport.onclose = () => {
-          this.sseTransports.delete(sseTransport.sessionId);
-          if (originalOnClose) originalOnClose();
-        };
+        // Keep session alive for Claude.ai initialization
+        // Don't delete session on connection close - let it timeout instead
         
         await this.mcpServer.connect(sseTransport);
       } catch (err) {
