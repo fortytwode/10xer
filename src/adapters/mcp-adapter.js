@@ -43,9 +43,9 @@ export class MCPAdapter extends BaseAdapter {
 
   getToolDescription(toolName) {
     const descriptions = {
-      facebook_login: 'Login to Facebook using OAuth to authenticate and access ad accounts',
-      facebook_logout: 'Logout from Facebook and clear stored credentials',
-      facebook_check_auth: 'Check current Facebook authentication status and token validity',
+      // facebook_login: 'Login to Facebook using OAuth to authenticate and access ad accounts',
+      // facebook_logout: 'Logout from Facebook and clear stored credentials',
+      // facebook_check_auth: 'Check current Facebook authentication status and token validity',
       facebook_list_ad_accounts: 'List all Facebook ad accounts accessible with the provided credentials',
       facebook_fetch_pagination_url: 'Fetch data from a Facebook Graph API pagination URL',
       facebook_get_details_of_ad_account: 'Get details of a specific ad account as per the fields provided',

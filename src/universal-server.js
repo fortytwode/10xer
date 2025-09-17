@@ -49,7 +49,8 @@ class UniversalFacebookAdsServer {
       openai: new OpenAIAdapter(), 
       gemini: new GeminiAdapter(),
       facebookAccessToken: null,
-      user_id: null
+      user_id: null,
+      currentFacebookAccessToken: null
     };
 
     // Initialize MCP server (existing functionality)
@@ -64,11 +65,34 @@ class UniversalFacebookAdsServer {
 
     this.facebookAccessTokens = {}; // Example: { "user_id1": "token1", "user_id2": "token2" }
     this.user_id = null
+    this.currentFacebookAccessToken = null
 
     // Initialize Express server for API endpoints
     this.apiServer = express();
     this.setupApiServer();
     this.setupMCPHandlers();
+  }
+
+  async fetchFacebookAccessToken(userId) {
+    const url = `https://10xer-web-production.up.railway.app/mcp-api/facebook_token_by_user?userId=${userId}`;
+    try {
+      const res = await fetch(url);
+
+      if (!res.ok) {
+        throw new Error(`Failed to fetch Facebook token: ${res.status}`);
+      }
+
+      const data = await res.json();
+      if (data.success && data.facebook_access_token) {
+        this.currentFacebookAccessToken = data.facebook_access_token;
+        console.error('✅ Facebook access token fetched:', this.facebookAccessToken.slice(0, 10) + '...');
+      } else {
+        throw new Error('Token not present in response');
+      }
+    } catch (err) {
+      console.error('❌ Error fetching Facebook token:', err.message);
+      throw err;
+    }
   }
 
   setupApiServer() {
@@ -495,34 +519,36 @@ class UniversalFacebookAdsServer {
   // }
 
   async executeToolCall({ toolName, args }) {
+    await this.fetchFacebookAccessToken(user_id)
+    console.error("this.currentFacebookAccessToken->", this.currentFacebookAccessToken);
     // Step 2: tool switch
     switch (toolName) {
-      case 'facebook_login':
-        return await facebookLogin(args);
+      // case 'facebook_login':
+      //   return await facebookLogin(args);
 
-      case 'facebook_logout':
-      return await facebookLogout(args);
+      // case 'facebook_logout':
+      // return await facebookLogout(args);
 
-      case 'facebook_check_auth':
-        return await facebookCheckAuth(args);
+      // case 'facebook_check_auth':
+      //   return await facebookCheckAuth(args);
       
       case 'facebook_list_ad_accounts':
-        return await listAdAccounts(args, this.currentFacebookToken);
+        return await listAdAccounts(args, this.currentFacebookAccessToken);
 
       case 'facebook_fetch_pagination_url':
-        return await fetchPaginationUrl(args, this.currentFacebookToken);
+        return await fetchPaginationUrl(args, this.currentFacebookAccessToken);
 
       case 'facebook_get_details_of_ad_account':
-        return await getAccountDetails(args, this.currentFacebookToken);
+        return await getAccountDetails(args, this.currentFacebookAccessToken);
 
       case 'facebook_get_adaccount_insights':
-        return await getAccountInsights(args, this.currentFacebookToken);
+        return await getAccountInsights(args, this.currentFacebookAccessToken);
 
       case 'facebook_get_activities_by_adaccount':
-        return await getAccountActivities(args, this.currentFacebookToken);
+        return await getAccountActivities(args, this.currentFacebookAccessToken);
 
       case 'facebook_get_ad_creatives':
-        return await getAdCreatives(args, this.currentFacebookToken);
+        return await getAdCreatives(args, this.currentFacebookAccessToken);
 
       case 'facebook_get_ad_thumbnails':
         throw new Error('get_ad_thumbnails_embedded tool is temporarily disabled');
@@ -571,15 +597,15 @@ class UniversalFacebookAdsServer {
   //   }
   // }
 
-  async fetchFacebookAccessToken() {
-    const helperUrl = 'https://10xer-production.up.railway.app/facebook-auth-helper';
+  // async fetchFacebookAccessToken() {
+  //   const helperUrl = 'https://10xer-production.up.railway.app/facebook-auth-helper';
 
-    console.log('🧭 Opening Facebook auth helper page...');
-    await open(helperUrl);
+  //   console.log('🧭 Opening Facebook auth helper page...');
+  //   await open(helperUrl);
 
-    // Instead of fetching the token immediately here, the user will do it via UI
-    throw new Error('🔐 Facebook login required. Please complete login in the browser.');
-  }
+  //   // Instead of fetching the token immediately here, the user will do it via UI
+  //   throw new Error('🔐 Facebook login required. Please complete login in the browser.');
+  // }
 
 
   // async startMCP() {
