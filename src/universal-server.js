@@ -153,6 +153,37 @@ class UniversalFacebookAdsServer {
       res.json({ status: 'ok', protocols: ['mcp', 'openai', 'gemini'] });
     });
 
+    // SSE test endpoint to verify Railway SSE support
+    this.apiServer.get('/sse-test', (req, res) => {
+      console.log('SSE test endpoint hit');
+      res.writeHead(200, {
+        'Content-Type': 'text/event-stream',
+        'Cache-Control': 'no-cache',
+        'Connection': 'keep-alive',
+        'Access-Control-Allow-Origin': '*'
+      });
+      
+      res.write('data: Railway SSE test started\n\n');
+      
+      let counter = 0;
+      const interval = setInterval(() => {
+        counter++;
+        res.write(`data: SSE message ${counter} - ${new Date().toISOString()}\n\n`);
+        
+        if (counter >= 10) {
+          clearInterval(interval);
+          res.write('data: SSE test completed\n\n');
+          res.end();
+        }
+      }, 2000);
+      
+      // Clean up on client disconnect
+      req.on('close', () => {
+        clearInterval(interval);
+        console.log('SSE test client disconnected');
+      });
+    });
+
     // OpenAI Function Calling endpoints
     this.apiServer.post('/openai/functions', async (req, res) => {
       try {
