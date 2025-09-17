@@ -280,6 +280,12 @@ class UniversalFacebookAdsServer {
       });
     });
 
+    // Facebook OAuth endpoint (the one referenced in start-auth)
+    this.apiServer.get('/auth/facebook', (req, res) => {
+      // For now, redirect to the auth helper page
+      res.redirect('/facebook-auth-helper');
+    });
+
     this.apiServer.get('/facebook-auth-helper', (req, res) => {
       res.send(`
         <!DOCTYPE html>
