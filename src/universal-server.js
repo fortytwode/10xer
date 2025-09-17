@@ -74,7 +74,9 @@ class UniversalFacebookAdsServer {
   }
 
   async fetchFacebookAccessToken(userId) {
-    const url = `https://10xer-web-production.up.railway.app/mcp-api/facebook_token_by_user?userId=${userId}`;
+    // For Claude.ai compatibility, use demo/default user when no userId provided
+    const effectiveUserId = userId || 'demo_user';
+    const url = `https://10xer-web-production.up.railway.app/mcp-api/facebook_token_by_user?userId=${effectiveUserId}`;
     try {
       const res = await fetch(url);
 
@@ -646,7 +648,7 @@ class UniversalFacebookAdsServer {
   async executeToolCall({ toolName, args }) {
     console.error("args->", args)
     console.error("args?.user_id->", args?.user_id)
-    await this.fetchFacebookAccessToken(this.user_id)
+    await this.fetchFacebookAccessToken(this.user_id || 'demo_user')
     console.error("this.currentFacebookAccessToken->", this.currentFacebookAccessToken);
     // Step 2: tool switch
     switch (toolName) {
