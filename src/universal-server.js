@@ -96,45 +96,6 @@ class UniversalFacebookAdsServer {
   }
 
   setupApiServer() {
-    this.apiServer.get('/mcp', async (req, res) => {
-      try {
-        this.activeSseTransport = new SSEServerTransport('/mcp', res);
-        await this.mcpServer.connect(this.activeSseTransport);
-      } catch (err) {
-        if (!res.headersSent) {
-          res.status(500).send('MCP connection failed');
-        }
-      }
-    });
-    // this.apiServer.get('/mcp', (req, res) => {
-    //   const sseTransport = new SSEServerTransport('/mcp', res);
-    //   this.mcpServer.connect(sseTransport).catch(err => {
-    //     console.error('SSE connection error:', err);
-    //     res.status(500).send('MCP connection failed');
-    //   });
-    // });
-
-    // this.apiServer.post('/mcp', (req, res) => {
-    //   const sseTransport = new SSEServerTransport('/mcp', res);
-    //   this.mcpServer.connect(sseTransport).catch(err => {
-    //     console.error('SSE connection error:', err);
-    //     res.status(500).send('MCP connection failed');
-    //   });
-    // });
-
-    this.apiServer.post('/mcp', async (req, res) => {
-      try {
-        if (!this.activeSseTransport) {
-          throw new Error('SSE connection not established');
-        }
-        await this.activeSseTransport.handlePostMessage(req, res);
-      } catch (err) {
-        console.error('SSE POST error:', err);
-        if (!res.headersSent) {
-          res.status(500).send('MCP POST failed');
-        }
-      }
-    });
     this.apiServer.use(cors());
     this.apiServer.use(express.json({ limit: '50mb' }));
     
@@ -258,6 +219,20 @@ class UniversalFacebookAdsServer {
     this.apiServer.get('/mcp', async (req, res) => {
       try {
         const sseTransport = new SSEServerTransport('/mcp', res);
+        
+        // Store transport by session ID for POST requests
+        if (!this.sseTransports) {
+          this.sseTransports = new Map();
+        }
+        this.sseTransports.set(sseTransport.sessionId, sseTransport);
+        
+        // Clean up when connection closes
+        const originalOnClose = sseTransport.onclose;
+        sseTransport.onclose = () => {
+          this.sseTransports.delete(sseTransport.sessionId);
+          if (originalOnClose) originalOnClose();
+        };
+        
         await this.mcpServer.connect(sseTransport);
       } catch (err) {
         console.error('SSE connection error:', err);
@@ -269,12 +244,21 @@ class UniversalFacebookAdsServer {
 
     this.apiServer.post('/mcp', async (req, res) => {
       try {
-        const sseTransport = new SSEServerTransport('/mcp', res);
+        const sessionId = req.query.sessionId;
+        if (!sessionId) {
+          throw new Error('Session ID required in POST request');
+        }
+        
+        if (!this.sseTransports || !this.sseTransports.has(sessionId)) {
+          throw new Error('SSE connection not found for session');
+        }
+        
+        const sseTransport = this.sseTransports.get(sessionId);
         await sseTransport.handlePostMessage(req, res);
       } catch (err) {
         console.error('SSE POST error:', err);
         if (!res.headersSent) {
-          res.status(500).send('MCP POST failed');
+          res.status(500).json({ error: `MCP POST failed: ${err.message}` });
         }
       }
     });
@@ -498,6 +482,79 @@ class UniversalFacebookAdsServer {
           success: false,
           message: 'Internal server error'
         });
+      }
+    });
+
+    // Claude.ai individual tool endpoints (REST API format)
+    this.apiServer.post('/tools/facebook_list_ad_accounts', async (req, res) => {
+      try {
+        const result = await this.executeToolCall({ toolName: 'facebook_list_ad_accounts', args: req.body });
+        res.json({ content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] });
+      } catch (error) {
+        res.status(500).json({ error: error.message });
+      }
+    });
+
+    this.apiServer.post('/tools/facebook_get_details_of_ad_account', async (req, res) => {
+      try {
+        const result = await this.executeToolCall({ toolName: 'facebook_get_details_of_ad_account', args: req.body });
+        res.json({ content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] });
+      } catch (error) {
+        res.status(500).json({ error: error.message });
+      }
+    });
+
+    this.apiServer.post('/tools/facebook_get_adaccount_insights', async (req, res) => {
+      try {
+        const result = await this.executeToolCall({ toolName: 'facebook_get_adaccount_insights', args: req.body });
+        res.json({ content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] });
+      } catch (error) {
+        res.status(500).json({ error: error.message });
+      }
+    });
+
+    this.apiServer.post('/tools/facebook_get_ad_creatives', async (req, res) => {
+      try {
+        const result = await this.executeToolCall({ toolName: 'facebook_get_ad_creatives', args: req.body });
+        res.json({ content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] });
+      } catch (error) {
+        res.status(500).json({ error: error.message });
+      }
+    });
+
+    this.apiServer.post('/tools/facebook_get_activities_by_adaccount', async (req, res) => {
+      try {
+        const result = await this.executeToolCall({ toolName: 'facebook_get_activities_by_adaccount', args: req.body });
+        res.json({ content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] });
+      } catch (error) {
+        res.status(500).json({ error: error.message });
+      }
+    });
+
+    this.apiServer.post('/tools/facebook_get_campaign_details', async (req, res) => {
+      try {
+        const result = await this.executeToolCall({ toolName: 'facebook_get_campaign_details', args: req.body });
+        res.json({ content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] });
+      } catch (error) {
+        res.status(500).json({ error: error.message });
+      }
+    });
+
+    this.apiServer.post('/tools/facebook_get_adset_details', async (req, res) => {
+      try {
+        const result = await this.executeToolCall({ toolName: 'facebook_get_adset_details', args: req.body });
+        res.json({ content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] });
+      } catch (error) {
+        res.status(500).json({ error: error.message });
+      }
+    });
+
+    this.apiServer.post('/tools/facebook_get_creative_asset_url_by_ad_id', async (req, res) => {
+      try {
+        const result = await this.executeToolCall({ toolName: 'facebook_get_creative_asset_url_by_ad_id', args: req.body });
+        res.json({ content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] });
+      } catch (error) {
+        res.status(500).json({ error: error.message });
       }
     });
   }
