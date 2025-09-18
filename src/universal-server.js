@@ -149,7 +149,6 @@ class UniversalFacebookAdsServer {
       try {
         this.activeSseTransport = new SSEServerTransport('/mcp', res);
         await this.mcpServer.connect(this.activeSseTransport);
-        console.log("this.activeSseTransport?.request?->", this.activeSseTransport?.request)
       } catch (err) {
         if (!res.headersSent) {
           res.status(500).send('MCP connection failed');
@@ -1259,26 +1258,40 @@ class UniversalFacebookAdsServer {
     // }
 
     let user_id = this.sessionUserMap.get(this.activeSseTransport.sessionId);
-
     if (!user_id) {
-      console.warn('⚠️ Session not found, attempting fallback using IP address');
+      console.warn('⚠️ No user_id found in session. Attempting fallback using IP address...');
 
       try {
-        const fallbackRes = await fetch(`https://10xer-web-production.up.railway.app/mcp-api/get_latest_session_by_ip`);
+        const fallbackUrl = `https://10xer-web-production.up.railway.app/mcp-api/get_latest_session_by_ip`;
+        console.log(`🌐 Fetching fallback session from: ${fallbackUrl}`);
+
+        const fallbackRes = await fetch(fallbackUrl);
+
+        // Handle non-200 responses
+        if (!fallbackRes.ok) {
+          console.error(`❌ HTTP error from fallback session API: ${fallbackRes.status} ${fallbackRes.statusText}`);
+          throw new Error(`Fallback API responded with status ${fallbackRes.status}`);
+        }
 
         const fallbackData = await fallbackRes.json();
 
-        if (fallbackData.success) {
+        // Optional: Log entire fallback response for debugging
+        console.debug('📦 Fallback API response:', fallbackData);
+
+        if (fallbackData && fallbackData.success && fallbackData.user_id) {
           user_id = fallbackData.user_id;
-          console.log(`✅ Fallback resolved user_id: ${user_id} from IP: ${ipAddress}`);
+          console.log(`✅ Fallback resolved user_id: ${user_id} from IP.`);
         } else {
-          throw new Error('No session found from IP fallback.');
+          console.warn('⚠️ Fallback API did not return a valid user_id.');
+          throw new Error('No valid session found via IP fallback.');
         }
-      } catch (e) {
-        console.error('❌ Fallback session fetch failed:', e.message);
+
+      } catch (error) {
+        console.error('❌ Fallback session fetch failed:', error.message);
         throw new Error('User session could not be resolved.');
       }
     }
+
 
     console.error("Resolved user_id from session or fallback:", user_id);
 
