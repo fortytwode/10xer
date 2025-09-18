@@ -421,6 +421,115 @@ class UniversalFacebookAdsServer {
       }
     });
 
+    // REST API endpoints for individual tools (Claude.ai connector compatibility)
+    this.apiServer.post('/tools/facebook_login', async (req, res) => {
+      try {
+        const result = await this.executeToolCall({
+          toolName: 'facebook_login',
+          args: req.body
+        });
+        res.json(result);
+      } catch (error) {
+        res.status(500).json({ error: error.message });
+      }
+    });
+
+    this.apiServer.post('/tools/facebook_logout', async (req, res) => {
+      try {
+        const result = await this.executeToolCall({
+          toolName: 'facebook_logout',
+          args: req.body
+        });
+        res.json(result);
+      } catch (error) {
+        res.status(500).json({ error: error.message });
+      }
+    });
+
+    this.apiServer.post('/tools/facebook_check_auth', async (req, res) => {
+      try {
+        const result = await this.executeToolCall({
+          toolName: 'facebook_check_auth',
+          args: req.body
+        });
+        res.json(result);
+      } catch (error) {
+        res.status(500).json({ error: error.message });
+      }
+    });
+
+    this.apiServer.post('/tools/facebook_list_ad_accounts', async (req, res) => {
+      try {
+        const result = await this.executeToolCall({
+          toolName: 'facebook_list_ad_accounts',
+          args: req.body
+        });
+        res.json(result);
+      } catch (error) {
+        res.status(500).json({ error: error.message });
+      }
+    });
+
+    this.apiServer.post('/tools/facebook_fetch_pagination_url', async (req, res) => {
+      try {
+        const result = await this.executeToolCall({
+          toolName: 'facebook_fetch_pagination_url',
+          args: req.body
+        });
+        res.json(result);
+      } catch (error) {
+        res.status(500).json({ error: error.message });
+      }
+    });
+
+    this.apiServer.post('/tools/facebook_get_details_of_ad_account', async (req, res) => {
+      try {
+        const result = await this.executeToolCall({
+          toolName: 'facebook_get_details_of_ad_account',
+          args: req.body
+        });
+        res.json(result);
+      } catch (error) {
+        res.status(500).json({ error: error.message });
+      }
+    });
+
+    this.apiServer.post('/tools/facebook_get_adaccount_insights', async (req, res) => {
+      try {
+        const result = await this.executeToolCall({
+          toolName: 'facebook_get_adaccount_insights',
+          args: req.body
+        });
+        res.json(result);
+      } catch (error) {
+        res.status(500).json({ error: error.message });
+      }
+    });
+
+    this.apiServer.post('/tools/facebook_get_activities_by_adaccount', async (req, res) => {
+      try {
+        const result = await this.executeToolCall({
+          toolName: 'facebook_get_activities_by_adaccount',
+          args: req.body
+        });
+        res.json(result);
+      } catch (error) {
+        res.status(500).json({ error: error.message });
+      }
+    });
+
+    this.apiServer.post('/tools/facebook_get_ad_creatives', async (req, res) => {
+      try {
+        const result = await this.executeToolCall({
+          toolName: 'facebook_get_ad_creatives',
+          args: req.body
+        });
+        res.json(result);
+      } catch (error) {
+        res.status(500).json({ error: error.message });
+      }
+    });
+
     // Claude OAuth endpoints
     this.apiServer.get('/mcp/start-auth/', (req, res) => {
       // For now, indicate that authentication is handled via tools
