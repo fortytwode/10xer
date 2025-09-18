@@ -1292,7 +1292,6 @@ class UniversalFacebookAdsServer {
       }
     }
 
-
     console.error("Resolved user_id from session or fallback:", user_id);
 
     await this.fetchLatestFacebookAccessToken(user_id);
