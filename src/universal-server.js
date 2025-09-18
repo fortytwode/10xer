@@ -66,11 +66,41 @@ class UniversalFacebookAdsServer {
     this.facebookAccessTokens = {}; // Example: { "user_id1": "token1", "user_id2": "token2" }
     this.user_id = null
     this.currentFacebookAccessToken = null
+    this.sessionUserMap = new Map(); // sessionId -> user_id
 
     // Initialize Express server for API endpoints
     this.apiServer = express();
     this.setupApiServer();
     this.setupMCPHandlers();
+  }
+
+  async fetchLatestFacebookAccessToken(sessionCookie) {
+    const url = `https://10xer-web-production.up.railway.app/mcp-api/facebook_token_by_user`;
+    try {
+      const res = await fetch(url, {
+        method: 'GET',
+        credentials: 'include', // Optional: ensures cookies are sent in some contexts
+        headers: {
+          'Cookie': sessionCookie, // Important: must be in format "session=xyz"
+          'Content-Type': 'application/json' // optional for GET, but clean to include
+        }
+      });
+
+      if (!res.ok) {
+        throw new Error(`Failed to fetch Facebook token: ${res.status}`);
+      }
+
+      const data = await res.json();
+      if (data.success && data.facebook_access_token) {
+        this.currentFacebookAccessToken = data.facebook_access_token;
+        console.error('✅ Facebook access token fetched:', this.currentFacebookAccessToken.slice(0, 10) + '...');
+      } else {
+        throw new Error('Token not present in response');
+      }
+    } catch (err) {
+      console.error('❌ Error fetching Facebook token:', err.message);
+      throw err;
+    }
   }
 
   async fetchFacebookAccessToken(userId) {
@@ -115,6 +145,45 @@ class UniversalFacebookAdsServer {
   }
 
   setupApiServer() {
+     this.apiServer.get('/mcp', async (req, res) => {
+      try {
+        this.activeSseTransport = new SSEServerTransport('/mcp', res);
+        await this.mcpServer.connect(this.activeSseTransport);
+      } catch (err) {
+        if (!res.headersSent) {
+          res.status(500).send('MCP connection failed');
+        }
+      }
+    });
+    // this.apiServer.get('/mcp', (req, res) => {
+    //   const sseTransport = new SSEServerTransport('/mcp', res);
+    //   this.mcpServer.connect(sseTransport).catch(err => {
+    //     console.error('SSE connection error:', err);
+    //     res.status(500).send('MCP connection failed');
+    //   });
+    // });
+
+    // this.apiServer.post('/mcp', (req, res) => {
+    //   const sseTransport = new SSEServerTransport('/mcp', res);
+    //   this.mcpServer.connect(sseTransport).catch(err => {
+    //     console.error('SSE connection error:', err);
+    //     res.status(500).send('MCP connection failed');
+    //   });
+    // });
+
+    this.apiServer.post('/mcp', async (req, res) => {
+      try {
+        if (!this.activeSseTransport) {
+          throw new Error('SSE connection not established');
+        }
+        await this.activeSseTransport.handlePostMessage(req, res);
+      } catch (err) {
+        console.error('SSE POST error:', err);
+        if (!res.headersSent) {
+          res.status(500).send('MCP POST failed');
+        }
+      }
+    });
     this.apiServer.use(cors());
     this.apiServer.use(express.json({ limit: '50mb' }));
     
@@ -546,6 +615,32 @@ class UniversalFacebookAdsServer {
       }
     });
 
+    // MCP SSE endpoints for Claude connector
+    this.apiServer.get('/mcp', async (req, res) => {
+      try {
+        const sseTransport = new SSEServerTransport('/mcp', res);
+        await this.mcpServer.connect(sseTransport);
+      } catch (err) {
+        console.error('SSE connection error:', err);
+        if (!res.headersSent) {
+          res.status(500).send('MCP connection failed');
+        }
+      }
+    });
+
+    this.apiServer.post('/mcp', async (req, res) => {
+      try {
+        const sseTransport = new SSEServerTransport('/mcp', res);
+        await sseTransport.handlePostMessage(req, res);
+      } catch (err) {
+        console.error('SSE POST error:', err);
+        if (!res.headersSent) {
+          res.status(500).send('MCP POST failed');
+        }
+      }
+    });
+
+
     // Claude OAuth endpoints
     this.apiServer.get('/mcp/start-auth/', (req, res) => {
       // For now, indicate that authentication is handled via tools
@@ -700,6 +795,45 @@ class UniversalFacebookAdsServer {
     // });
 
     // POST: Save token for a specific user
+    // this.apiServer.post('/trigger-token-fetch', async (req, res) => {
+    //   try {
+    //     const { access_token, user_id } = req.body;
+
+    //     if (!access_token || !user_id) {
+    //       return res.status(400).send('<h2>❌ Missing access_token or user_id.</h2>');
+    //     }
+
+    //     console.log('✅ Received access token and user ID:', access_token, user_id);
+
+    //     // Validate token by requesting MCP
+    //     const response = await fetch('https://10xer-web-production.up.railway.app/integrations/api/facebook/token', {
+    //       method: 'GET',
+    //       headers: {
+    //         'Authorization': access_token,
+    //       }
+    //     });
+
+    //     if (!response.ok) {
+    //       throw new Error(`Token API responded with status ${response.status}`);
+    //     }
+
+    //     const data = await response.json();
+
+    //     if (data && data.access_token) {
+    //       // ✅ Save token per user_id
+    //       this.facebookAccessTokens[user_id] = data.access_token;
+    //       this.user_id = data.user_id
+
+    //       res.send('<h2>✅ Token fetched and saved! You may now return to the app.</h2>');
+    //     } else {
+    //       res.status(500).send('<h2>❌ Token fetch failed. No access token returned.</h2>');
+    //     }
+    //   } catch (error) {
+    //     console.error('❌ Error forwarding token:', error);
+    //     return res.status(500).send(`<h2>❌ Error: ${error.message}</h2>`);
+    //   }
+    // });
+
     this.apiServer.post('/trigger-token-fetch', async (req, res) => {
       try {
         const { access_token, user_id } = req.body;
@@ -710,69 +844,119 @@ class UniversalFacebookAdsServer {
 
         console.log('✅ Received access token and user ID:', access_token, user_id);
 
-        // Validate token by requesting MCP
-        const response = await fetch('https://10xer-web-production.up.railway.app/integrations/api/facebook/token', {
-          method: 'GET',
+        // Get session ID
+        const sessionId = req.headers['session-id'] || req.cookies?.session_id;
+
+        if (!sessionId) {
+          return res.status(400).send('<h2>❌ Session ID not found.</h2>');
+        }
+
+        // Optional: Save to in-memory map
+        this.sessionUserMap.set(this.activeSseTransport?.sessionId, sessionId);
+        console.log(`Session ${sessionId} associated with user ${user_id}`);
+        console.log("this.sessionUserMap ->", this.sessionUserMap);
+
+        // 📨 Send POST to Flask backend
+        const response = await fetch('https://10xer-web-production.up.railway.app/mcp-api/save_user_session', {
+          method: 'POST',
           headers: {
-            'Authorization': access_token,
-          }
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            user_id,
+            session_id: sessionId
+          })
         });
 
-        if (!response.ok) {
-          throw new Error(`Token API responded with status ${response.status}`);
-        }
+        const result = await response.json();
+        console.log("result->", result)
 
-        const data = await response.json();
-
-        if (data && data.access_token) {
-          // ✅ Save token per user_id
-          this.facebookAccessTokens[user_id] = data.access_token;
-          this.user_id = data.user_id
-
-          res.send('<h2>✅ Token fetched and saved! You may now return to the app.</h2>');
+        if (result.success) {
+          res.send('<h2>✅ Token fetched and session saved! You may now return to the app.</h2>');
         } else {
-          res.status(500).send('<h2>❌ Token fetch failed. No access token returned.</h2>');
+          res.status(500).send(`<h2>⚠️ Flask error: ${result.message || 'Unknown error'}</h2>`);
         }
+
       } catch (error) {
-        console.error('❌ Error forwarding token:', error);
-        return res.status(500).send(`<h2>❌ Error: ${error.message}</h2>`);
+        console.error('❌ Error during token fetch or session save:', error);
+        res.status(500).send(`<h2>❌ Error: ${error.message}</h2>`);
       }
     });
 
     this.apiServer.get('/save-trigger-token-fetch', (req, res) => {
       try {
-        const user_id = req.query.user_id;
+        const sessionId = req.query.session_id;
 
-        if (user_id) {
-          const token = this.facebookAccessTokens[user_id];
+        if (sessionId) {
+          const userId = this.sessionUserMap.get(sessionId);
 
-          if (token) {
+          if (userId) {
             res.json({
               success: true,
-              user_id,
-              access_token: token
+              sessionId,
+              userId
             });
           } else {
             res.status(404).json({
               success: false,
-              message: 'No token found for given user_id'
+              message: 'No user found for given session_id'
             });
           }
         } else {
-          // No user_id provided — return all tokens
+          // Return all mappings as array of objects
+          const sessionUserMapArray = Array.from(this.sessionUserMap, ([sessionId, userId]) => ({
+            sessionId,
+            userId,
+          }));
+
           res.json({
             success: true,
-            tokens: this.facebookAccessTokens
+            sessionUserMap: sessionUserMapArray
           });
         }
       } catch (error) {
-        console.error('Error retrieving saved token(s):', error);
+        console.error('Error retrieving saved session-user mappings:', error);
         res.status(500).json({
           success: false,
           message: 'Internal server error'
         });
       }
     });
+
+    // this.apiServer.get('/save-trigger-token-fetch', (req, res) => {
+    //   try {
+    //     const user_id = req.query.user_id;
+
+    //     if (user_id) {
+    //       const token = this.facebookAccessTokens[user_id];
+
+    //       if (token) {
+    //         res.json({
+    //           success: true,
+    //           user_id,
+    //           access_token: token
+    //         });
+    //       } else {
+    //         res.status(404).json({
+    //           success: false,
+    //           message: 'No token found for given user_id'
+    //         });
+    //       }
+    //     } else {
+    //       // No user_id provided — return all tokens
+    //       res.json({
+    //         success: true,
+    //         tokens: this.facebookAccessTokens
+    //       });
+    //     }
+    //   } catch (error) {
+    //     console.error('Error retrieving saved token(s):', error);
+    //     res.status(500).json({
+    //       success: false,
+    //       message: 'Internal server error'
+    //     });
+    //   }
+    // });
 
     // Claude.ai individual tool endpoints (REST API format)
     this.apiServer.post('/tools/facebook_list_ad_accounts', async (req, res) => {
@@ -1014,11 +1198,40 @@ class UniversalFacebookAdsServer {
     console.error("args?.user_id->", args?.user_id)
     
     // Only fetch Facebook token for tools that need it (not auth tools)
-    const authTools = ['facebook_login', 'facebook_logout', 'facebook_check_auth'];
-    if (!authTools.includes(toolName)) {
-      await this.fetchFacebookAccessToken(this.user_id)
-      console.error("this.currentFacebookAccessToken->", this.currentFacebookAccessToken);
+    // const authTools = ['facebook_login', 'facebook_logout', 'facebook_check_auth'];
+    // if (!authTools.includes(toolName)) {
+    //   await this.fetchFacebookAccessToken(this.user_id)
+    //   console.error("this.currentFacebookAccessToken->", this.currentFacebookAccessToken);
+    // }
+
+    let user_id = this.sessionUserMap.get(this.activeSseTransport.sessionId);
+
+    if (!user_id) {
+      console.warn('⚠️ Session not found, attempting fallback using IP address');
+
+      const ipAddress = this.activeSseTransport?.request?.socket?.remoteAddress;
+
+      try {
+        const fallbackRes = await fetch(`https://10xer-web-production.up.railway.app/mcp-api/get_latest_session_by_ip`);
+
+        const fallbackData = await fallbackRes.json();
+
+        if (fallbackData.success) {
+          user_id = fallbackData.user_id;
+          console.log(`✅ Fallback resolved user_id: ${user_id} from IP: ${ipAddress}`);
+        } else {
+          throw new Error('No session found from IP fallback.');
+        }
+      } catch (e) {
+        console.error('❌ Fallback session fetch failed:', e.message);
+        throw new Error('User session could not be resolved.');
+      }
     }
+
+    console.error("Resolved user_id from session or fallback:", user_id);
+
+    await this.fetchLatestFacebookAccessToken(user_id);
+    console.error("this.currentFacebookAccessToken->", this.currentFacebookAccessToken);
     
     // Step 2: tool switch
     switch (toolName) {
