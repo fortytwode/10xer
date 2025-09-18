@@ -307,6 +307,59 @@ class UniversalFacebookAdsServer {
       }
     });
 
+    // TESTING: Handle MCP requests to manifest URLs (Claude.ai does this)
+    this.apiServer.post('/test-manifest/:variant', async (req, res) => {
+      const variant = req.params.variant;
+      console.log(`🔗 MCP request to test manifest: ${variant}`);
+      
+      try {
+        // Handle MCP protocol on manifest endpoint
+        const message = req.body;
+        
+        if (message.method === 'initialize') {
+          res.json({
+            jsonrpc: "2.0",
+            id: message.id,
+            result: {
+              protocolVersion: "2025-06-18",
+              capabilities: { tools: {} },
+              serverInfo: { name: "facebook-ads-test", version: "1.0.0" }
+            }
+          });
+        } else if (message.method === 'tools/list') {
+          const tools = this.adapters.mcp.getToolDefinitions(TOOL_SCHEMAS);
+          res.json({
+            jsonrpc: "2.0",
+            id: message.id,
+            result: { tools }
+          });
+        } else if (message.method === 'tools/call') {
+          const result = await this.executeToolCall({
+            toolName: message.params.name,
+            args: message.params.arguments || {}
+          });
+          res.json({
+            jsonrpc: "2.0", 
+            id: message.id,
+            result: result
+          });
+        } else {
+          res.json({
+            jsonrpc: "2.0",
+            id: message.id,
+            error: { code: -32601, message: `Method not found: ${message.method}` }
+          });
+        }
+      } catch (error) {
+        console.error('MCP test manifest error:', error);
+        res.status(500).json({
+          jsonrpc: "2.0",
+          id: req.body.id || 0,
+          error: { code: -32603, message: error.message }
+        });
+      }
+    });
+
     this.apiServer.use('/.well-known', express.static(path.join(__dirname, '../public/.well-known')));
     this.apiServer.use(express.static(path.join(__dirname, '../public')));
     
