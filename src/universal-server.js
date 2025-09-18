@@ -1280,7 +1280,7 @@ class UniversalFacebookAdsServer {
 
         if (fallbackData && fallbackData.success && fallbackData.user_id) {
           user_id = fallbackData.session_id;
-          console.log(`✅ Fallback resolved session_id: ${session_id} from IP.`);
+          console.log(`✅ Fallback resolved session_id: ${fallbackData.session_id} from IP.`);
         } else {
           console.warn('⚠️ Fallback API did not return a valid user_id.');
           throw new Error('No valid session found via IP fallback.');
