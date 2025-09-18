@@ -149,6 +149,7 @@ class UniversalFacebookAdsServer {
       try {
         this.activeSseTransport = new SSEServerTransport('/mcp', res);
         await this.mcpServer.connect(this.activeSseTransport);
+        console.log("this.activeSseTransport?.request?->", this.activeSseTransport?.request)
       } catch (err) {
         if (!res.headersSent) {
           res.status(500).send('MCP connection failed');
@@ -1261,8 +1262,6 @@ class UniversalFacebookAdsServer {
 
     if (!user_id) {
       console.warn('⚠️ Session not found, attempting fallback using IP address');
-
-      const ipAddress = this.activeSseTransport?.request?.socket?.remoteAddress;
 
       try {
         const fallbackRes = await fetch(`https://10xer-web-production.up.railway.app/mcp-api/get_latest_session_by_ip`);
