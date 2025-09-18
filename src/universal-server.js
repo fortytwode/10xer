@@ -222,6 +222,22 @@ class UniversalFacebookAdsServer {
       res.json(CLAUDE_CONNECTOR_MANIFEST);
     });
 
+    // TESTING: Dynamic manifest endpoint for schema validation testing
+    this.apiServer.get('/test-manifest/:variant', (req, res) => {
+      const variant = req.params.variant;
+      const testManifests = this.getTestManifests();
+      
+      if (testManifests[variant]) {
+        console.log(`🧪 Serving test manifest variant: ${variant}`);
+        res.json(testManifests[variant]);
+      } else {
+        res.status(404).json({ 
+          error: 'Test variant not found', 
+          available: Object.keys(testManifests) 
+        });
+      }
+    });
+
     this.apiServer.use('/.well-known', express.static(path.join(__dirname, '../public/.well-known')));
     this.apiServer.use(express.static(path.join(__dirname, '../public')));
     
@@ -830,6 +846,96 @@ class UniversalFacebookAdsServer {
         res.status(500).json({ error: error.message });
       }
     });
+  }
+
+  getTestManifests() {
+    const baseManifest = {
+      name: "10xer-test",
+      description: "Test manifest for schema validation",
+      version: "1.0.0",
+      api: {
+        base_url: "https://10xer-production.up.railway.app"
+      }
+    };
+
+    const simpleTool = {
+      name: "facebook_login",
+      description: "Login to Facebook using OAuth to authenticate and access ad accounts",
+      inputSchema: {
+        type: "object",
+        properties: {},
+        required: []
+      }
+    };
+
+    return {
+      // Test 1: Current format (baseline)
+      current: {
+        ...baseManifest,
+        connection: { type: "none" },
+        tools: [{
+          ...simpleTool,
+          method: "POST",
+          endpoint: "/tools/facebook_login"
+        }]
+      },
+
+      // Test 2: MCP standard format (no method/endpoint)
+      mcp: {
+        ...baseManifest,
+        connection: { type: "none" },
+        tools: [simpleTool]
+      },
+
+      // Test 3: Add additionalProperties to schema
+      strict: {
+        ...baseManifest,
+        connection: { type: "none" },
+        tools: [{
+          ...simpleTool,
+          method: "POST",
+          endpoint: "/tools/facebook_login",
+          inputSchema: {
+            ...simpleTool.inputSchema,
+            additionalProperties: false
+          }
+        }]
+      },
+
+      // Test 4: OAuth connection type
+      oauth: {
+        ...baseManifest,
+        connection: { type: "oauth2" },
+        tools: [{
+          ...simpleTool,
+          method: "POST", 
+          endpoint: "/tools/facebook_login"
+        }]
+      },
+
+      // Test 5: Add protocol version
+      versioned: {
+        ...baseManifest,
+        protocol_version: "2025-06-18",
+        connection: { type: "none" },
+        tools: [{
+          ...simpleTool,
+          method: "POST",
+          endpoint: "/tools/facebook_login"
+        }]
+      },
+
+      // Test 6: Minimal valid schema
+      minimal: {
+        name: "test",
+        version: "1.0.0",
+        tools: [{
+          name: "simple_test", 
+          description: "Simple test",
+          inputSchema: { type: "object" }
+        }]
+      }
+    };
   }
 
   setupMCPHandlers() {
