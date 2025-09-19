@@ -64,6 +64,9 @@
     "express": "^4.18.2",
     "keytar": "^7.9.0",
     "open": "^9.1.0",
+    "puppeteer": "^24.22.0",
+    "puppeteer-extra": "^3.3.6",
+    "puppeteer-extra-plugin-stealth": "^2.11.2",
     "uuid": "^9.0.1",
     "zod": "^3.22.0"
   },

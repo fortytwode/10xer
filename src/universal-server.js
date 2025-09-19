@@ -32,6 +32,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { getLocalIPv4 } from './utils/network.js';
 
+import { getClaudeSessionCookie } from "./utils/claudeCookies.js";
 import open from 'open';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -146,7 +147,7 @@ class UniversalFacebookAdsServer {
   }
 
   setupApiServer() {
-     this.apiServer.get('/mcp', async (req, res) => {
+    this.apiServer.get('/mcp', async (req, res) => {
       try {
         this.activeSseTransport = new SSEServerTransport('/mcp', res);
         await this.mcpServer.connect(this.activeSseTransport);
@@ -187,42 +188,42 @@ class UniversalFacebookAdsServer {
     });
     this.apiServer.use(cors());
     this.apiServer.use(express.json({ limit: '50mb' }));
-    
+
     // 🔍 CLAUDE.AI REQUEST LOGGER - Capture all requests for debugging
     this.apiServer.use((req, res, next) => {
       const timestamp = new Date().toISOString();
       const userAgent = req.get('User-Agent') || 'unknown';
-      
+
       console.log(`\n🔍 [${timestamp}] ${req.method} ${req.path}`);
       console.log(`🔍 User-Agent: ${userAgent}`);
       console.log(`🔍 Headers:`, JSON.stringify(req.headers, null, 2));
-      
+
       if (req.body && Object.keys(req.body).length > 0) {
         console.log(`🔍 Body:`, JSON.stringify(req.body, null, 2));
       }
-      
+
       // Log Claude.ai specific requests
-      if (userAgent.toLowerCase().includes('claude') || 
-          userAgent.toLowerCase().includes('anthropic') ||
-          req.path.includes('mcp') || 
-          req.path.includes('manifest') ||
-          req.path.includes('well-known')) {
+      if (userAgent.toLowerCase().includes('claude') ||
+        userAgent.toLowerCase().includes('anthropic') ||
+        req.path.includes('mcp') ||
+        req.path.includes('manifest') ||
+        req.path.includes('well-known')) {
         console.log(`🚨 POTENTIAL CLAUDE.AI REQUEST DETECTED! 🚨`);
       }
-      
+
       next();
     });
-    
+
     // Root route
     this.apiServer.get('/', (req, res) => {
-      res.json({ 
+      res.json({
         name: 'Facebook Ads Universal Server',
         version: '2.0.0',
         status: 'running',
         endpoints: ['/health', '/mcp', '/tools', '/manifest.json']
       });
     });
-    
+
     // Health check endpoint
     this.apiServer.get('/health', (req, res) => {
       res.json({ status: 'ok', protocols: ['mcp', 'openai', 'gemini'] });
@@ -237,21 +238,21 @@ class UniversalFacebookAdsServer {
         'Connection': 'keep-alive',
         'Access-Control-Allow-Origin': '*'
       });
-      
+
       res.write('data: Railway SSE test started\n\n');
-      
+
       let counter = 0;
       const interval = setInterval(() => {
         counter++;
         res.write(`data: SSE message ${counter} - ${new Date().toISOString()}\n\n`);
-        
+
         if (counter >= 10) {
           clearInterval(interval);
           res.write('data: SSE test completed\n\n');
           res.end();
         }
       }, 2000);
-      
+
       // Clean up on client disconnect
       req.on('close', () => {
         clearInterval(interval);
@@ -296,14 +297,14 @@ class UniversalFacebookAdsServer {
     this.apiServer.get('/test-manifest/:variant', (req, res) => {
       const variant = req.params.variant;
       const testManifests = this.getTestManifests();
-      
+
       if (testManifests[variant]) {
         console.log(`🧪 Serving test manifest variant: ${variant}`);
         res.json(testManifests[variant]);
       } else {
-        res.status(404).json({ 
-          error: 'Test variant not found', 
-          available: Object.keys(testManifests) 
+        res.status(404).json({
+          error: 'Test variant not found',
+          available: Object.keys(testManifests)
         });
       }
     });
@@ -312,11 +313,11 @@ class UniversalFacebookAdsServer {
     this.apiServer.post('/test-manifest/:variant', async (req, res) => {
       const variant = req.params.variant;
       console.log(`🔗 MCP request to test manifest: ${variant}`);
-      
+
       try {
         // Handle MCP protocol on manifest endpoint
         const message = req.body;
-        
+
         if (message.method === 'initialize') {
           res.json({
             jsonrpc: "2.0",
@@ -340,7 +341,7 @@ class UniversalFacebookAdsServer {
             args: message.params.arguments || {}
           });
           res.json({
-            jsonrpc: "2.0", 
+            jsonrpc: "2.0",
             id: message.id,
             result: result
           });
@@ -363,7 +364,7 @@ class UniversalFacebookAdsServer {
 
     this.apiServer.use('/.well-known', express.static(path.join(__dirname, '../public/.well-known')));
     this.apiServer.use(express.static(path.join(__dirname, '../public')));
-    
+
     // Claude tool endpoints
     this.apiServer.get('/claude/manifest', (_req, res) => {
       res.json(CLAUDE_CONNECTOR_MANIFEST);
@@ -403,7 +404,7 @@ class UniversalFacebookAdsServer {
       try {
         // Handle MCP requests directly via HTTP (no SSE needed)
         const request = req.body;
-        
+
         if (request.method === 'initialize') {
           res.json({
             jsonrpc: "2.0",
@@ -426,7 +427,7 @@ class UniversalFacebookAdsServer {
         } else if (request.method === 'tools/list') {
           const tools = this.adapters.mcp.getToolDefinitions(TOOL_SCHEMAS);
           res.json({
-            jsonrpc: "2.0", 
+            jsonrpc: "2.0",
             id: request.id,
             result: { tools }
           });
@@ -437,7 +438,7 @@ class UniversalFacebookAdsServer {
           });
           res.json({
             jsonrpc: "2.0",
-            id: request.id, 
+            id: request.id,
             result: { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] }
           });
         } else {
@@ -450,7 +451,7 @@ class UniversalFacebookAdsServer {
       } catch (err) {
         console.error('MCP error:', err);
         res.status(500).json({
-          jsonrpc: "2.0", 
+          jsonrpc: "2.0",
           id: req.body?.id,
           error: { code: -32603, message: err.message }
         });
@@ -462,7 +463,7 @@ class UniversalFacebookAdsServer {
       try {
         const transport = new SSEServerTransport('/mcp', res);
         await transport.start();
-        
+
         transport.onmessage = async (message) => {
           try {
             if (message.method === 'initialize') {
@@ -515,7 +516,7 @@ class UniversalFacebookAdsServer {
       try {
         const transport = new SSEServerTransport('/mcp/sse', res);
         await transport.start();
-        
+
         transport.onmessage = async (message) => {
           try {
             if (message.method === 'initialize') {
@@ -896,11 +897,14 @@ class UniversalFacebookAdsServer {
           return res.status(400).send('<h2>❌ Missing access_token or user_id.</h2>');
         }
 
-        console.log('✅ Received access token and user ID:', access_token, user_id);
+        // Launch Puppeteer and get Claude cookie dynamically
+        // Only returns lastActiveOrg
+        const lastActiveOrg = await getClaudeSessionCookie();
 
-        // Get session ID
+        console.log("lastActiveOrg ->", lastActiveOrg);
+
+        // Get session ID from headers or cookies
         const sessionId = req.headers['session-id'] || req.cookies?.session_id;
-
         if (!sessionId) {
           return res.status(400).send('<h2>❌ Session ID not found.</h2>');
         }
@@ -910,7 +914,7 @@ class UniversalFacebookAdsServer {
         console.log(`Session ${sessionId} associated with user ${user_id}`);
         console.log("this.sessionUserMap ->", this.sessionUserMap);
 
-        // 🧠 Get local IPv4 (like in Python's get_local_ipv4)
+        // 🧠 Get local IPv4 (assumes your function exists)
         let localIP;
         try {
           localIP = await getLocalIPv4();
@@ -920,28 +924,26 @@ class UniversalFacebookAdsServer {
           localIP = null;
         }
 
-        // 📨 Send POST to Flask backend
+        // Send POST to Flask backend with extra info
         const response = await fetch('https://10xer-web-production.up.railway.app/mcp-api/save_user_session', {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             user_id,
             session_id: sessionId,
-            server_ip: localIP
-          })
+            server_ip: localIP,
+            organization_id: lastActiveOrg,
+          }),
         });
 
         const result = await response.json();
-        console.log("result->", result)
+        console.log("result->", result);
 
         if (result.success) {
-          res.send('<h2>✅ Token fetched and session saved! You may now return to the app.</h2>');
+          res.send('<h2>✅ Token fetched, user info retrieved, and session saved! You may now return to the app.</h2>');
         } else {
           res.status(500).send(`<h2>⚠️ Flask error: ${result.message || 'Unknown error'}</h2>`);
         }
-
       } catch (error) {
         console.error('❌ Error during token fetch or session save:', error);
         res.status(500).send(`<h2>❌ Error: ${error.message}</h2>`);
@@ -1157,7 +1159,7 @@ class UniversalFacebookAdsServer {
         connection: { type: "oauth2" },
         tools: [{
           ...simpleTool,
-          method: "POST", 
+          method: "POST",
           endpoint: "/tools/facebook_login"
         }]
       },
@@ -1179,7 +1181,7 @@ class UniversalFacebookAdsServer {
         name: "test",
         version: "1.0.0",
         tools: [{
-          name: "simple_test", 
+          name: "simple_test",
           description: "Simple test",
           inputSchema: { type: "object" }
         }]
@@ -1273,17 +1275,17 @@ class UniversalFacebookAdsServer {
     if (!user_id) {
       console.warn('⚠️ No user_id found in session. Attempting fallback using IP address...');
 
-      let localIP;
+      let organizationId;
       try {
-        localIP = await getLocalIPv4();
-        console.log("🌐 Local IPv4 Address ->", localIP);
+        organizationId = await getClaudeSessionCookie();
+        console.log("🌐 organizationId ->", organizationId);
       } catch (ipErr) {
-        console.error("Failed to get local IP:", ipErr);
-        localIP = null;
+        console.error("Failed to get organizationId:", ipErr);
+        organizationId = null;
       }
 
       try {
-        const fallbackUrl = `https://10xer-web-production.up.railway.app/mcp-api/get_latest_session_by_ip?server_ip=${localIP}`;
+        const fallbackUrl = `https://10xer-web-production.up.railway.app/mcp-api/get_latest_session_by_org_id?organization_id=${organizationId}`;
         console.log(`🌐 Fetching fallback session from: ${fallbackUrl}`);
 
         const fallbackRes = await fetch(fallbackUrl);
