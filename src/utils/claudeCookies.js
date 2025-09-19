@@ -11,10 +11,15 @@ puppeteer.use(StealthPlugin());
 export async function getClaudeSessionCookie() {
   console.log("🚀 Launching browser (with stealth)...");
 
-  const browser = await puppeteer.launch({
-    headless: false, // must be false for manual login
-    args: ["--no-sandbox", "--disable-setuid-sandbox"],
-  });
+//   const browser = await puppeteer.launch({
+//     headless: false, // must be false for manual login
+//     args: ["--no-sandbox", "--disable-setuid-sandbox"],
+//   });
+    const browser = await puppeteer.launch({
+    headless: true,
+    executablePath: '/usr/bin/google-chrome-stable', // path inside container
+    args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'],
+    });
 
   try {
     const page = await browser.newPage();
