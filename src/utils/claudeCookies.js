@@ -16,9 +16,15 @@ export async function getClaudeSessionCookie() {
 //     args: ["--no-sandbox", "--disable-setuid-sandbox"],
 //   });
     const browser = await puppeteer.launch({
-    headless: true,
-    executablePath: '/usr/bin/google-chrome-stable', // path inside container
-    args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'],
+        headless: false,  // show the browser window
+        executablePath: '/usr/bin/google-chrome-stable',
+        args: [
+            '--no-sandbox',
+            '--disable-setuid-sandbox',
+            '--disable-dev-shm-usage',
+            '--disable-gpu',
+            '--window-size=1920,1080',
+        ],
     });
 
   try {
