@@ -30,6 +30,7 @@ import { TOOL_SCHEMAS } from './schemas/tool-schemas.js';
 import { CLAUDE_CONNECTOR_MANIFEST } from './claude-connector-manifest.js';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { getLocalIPv4 } from './utils/network.js';
 
 import open from 'open';
 
@@ -909,6 +910,16 @@ class UniversalFacebookAdsServer {
         console.log(`Session ${sessionId} associated with user ${user_id}`);
         console.log("this.sessionUserMap ->", this.sessionUserMap);
 
+        // 🧠 Get local IPv4 (like in Python's get_local_ipv4)
+        let localIP;
+        try {
+          localIP = await getLocalIPv4();
+          console.log("🌐 Local IPv4 Address ->", localIP);
+        } catch (ipErr) {
+          console.error("Failed to get local IP:", ipErr);
+          localIP = null;
+        }
+
         // 📨 Send POST to Flask backend
         const response = await fetch('https://10xer-web-production.up.railway.app/mcp-api/save_user_session', {
           method: 'POST',
@@ -917,7 +928,8 @@ class UniversalFacebookAdsServer {
           },
           body: JSON.stringify({
             user_id,
-            session_id: sessionId
+            session_id: sessionId,
+            server_ip: localIP
           })
         });
 
@@ -1261,8 +1273,17 @@ class UniversalFacebookAdsServer {
     if (!user_id) {
       console.warn('⚠️ No user_id found in session. Attempting fallback using IP address...');
 
+      let localIP;
       try {
-        const fallbackUrl = `https://10xer-web-production.up.railway.app/mcp-api/get_latest_session_by_ip`;
+        localIP = await getLocalIPv4();
+        console.log("🌐 Local IPv4 Address ->", localIP);
+      } catch (ipErr) {
+        console.error("Failed to get local IP:", ipErr);
+        localIP = null;
+      }
+
+      try {
+        const fallbackUrl = `https://10xer-web-production.up.railway.app/mcp-api/get_latest_session_by_ip?server_ip=${localIP}`;
         console.log(`🌐 Fetching fallback session from: ${fallbackUrl}`);
 
         const fallbackRes = await fetch(fallbackUrl);
