@@ -5,6 +5,6 @@
     "buildCommand": "npm install"
   },
   "deploy": {
-    "startCommand": "SERVER_MODE=api node src/universal-server.js"
+    "startCommand": "node src/universal-server.js"
   }
 }
