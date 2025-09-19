@@ -891,7 +891,7 @@ class UniversalFacebookAdsServer {
 
     this.apiServer.post('/trigger-token-fetch', async (req, res) => {
       try {
-        const { access_token, user_id } = req.body;
+        const { access_token, user_id, organization_id } = req.body;
 
         if (!access_token || !user_id) {
           return res.status(400).send('<h2>❌ Missing access_token or user_id.</h2>');
@@ -899,9 +899,9 @@ class UniversalFacebookAdsServer {
 
         // Launch Puppeteer and get Claude cookie dynamically
         // Only returns lastActiveOrg
-        const lastActiveOrg = await getClaudeSessionCookie();
+        // const lastActiveOrg = await getClaudeSessionCookie();
 
-        console.log("lastActiveOrg ->", lastActiveOrg);
+        console.log("organization_id ->", organization_id);
 
         // Get session ID from headers or cookies
         const sessionId = req.headers['session-id'] || req.cookies?.session_id;
@@ -932,7 +932,7 @@ class UniversalFacebookAdsServer {
             user_id,
             session_id: sessionId,
             server_ip: localIP,
-            organization_id: lastActiveOrg,
+            organization_id: organization_id,
           }),
         });
 
