@@ -38,4 +38,6 @@ COPY . .
 # Set environment variable to use Chrome installed here
 ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/google-chrome-stable
 
+RUN which google-chrome-stable
+
 CMD ["node", "src/universal-server.js"]
