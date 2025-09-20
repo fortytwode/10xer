@@ -1276,13 +1276,36 @@ class UniversalFacebookAdsServer {
       console.warn('⚠️ No user_id found in session. Attempting fallback using IP address...');
 
       let organizationId;
-      try {
-        organizationId = await getClaudeSessionCookie();
-        console.log("🌐 organizationId ->", organizationId);
-      } catch (ipErr) {
-        console.error("Failed to get organizationId:", ipErr);
-        organizationId = null;
-      }
+      // Open the popup window to Flask form
+      const popup = window.open(
+        'https://10xer-web-production.up.railway.app/integrations/enter_organization',
+        'EnterOrganization',
+        'width=500,height=600,scrollbars=yes'
+      );
+
+      // Wait for the popup to send us the organization ID via postMessage
+      organizationId = await new Promise((resolve, reject) => {
+        function receiveMessage(event) {
+          // Verify the message origin if needed
+          if (event.origin !== 'https://10xer-web-production.up.railway.app') return;
+          
+          if (event.data.organizationId) {
+            window.removeEventListener('message', receiveMessage);
+            resolve(event.data.organizationId);
+            popup.close();
+          }
+        }
+        window.addEventListener('message', receiveMessage);
+
+        // Optional: timeout if user takes too long
+        setTimeout(() => {
+          window.removeEventListener('message', receiveMessage);
+          reject(new Error('Timeout waiting for organization ID'));
+          popup.close();
+        }, 5 * 60 * 1000); // 5 minutes
+      });
+
+      console.log("Received organization ID from popup:", organizationId);
 
       try {
         const fallbackUrl = `https://10xer-web-production.up.railway.app/mcp-api/get_latest_session_by_org_id?organization_id=${organizationId}`;
