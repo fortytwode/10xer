@@ -1261,20 +1261,18 @@ class UniversalFacebookAdsServer {
   // }
 
   async waitForOrganizationId() {
-    // Open the browser to the Flask input form
     await open('https://10xer-web-production.up.railway.app/integrations/enter_organization');
-
     console.log("🔍 Waiting for user to submit organization ID...");
 
     let organizationId = null;
-    const maxAttempts = 100; // ~5 minutes if interval is 3s
-    const interval = 3000; // 3 seconds
+    const maxAttempts = 10;
+    const interval = 3000;
 
     for (let i = 0; i < maxAttempts; i++) {
       try {
         const res = await fetch('https://10xer-web-production.up.railway.app/integrations/enter_organization', {
           method: 'GET',
-          credentials: 'include', // required if using session cookies
+          credentials: 'include',
         });
 
         if (res.ok) {
@@ -1286,7 +1284,7 @@ class UniversalFacebookAdsServer {
           }
         }
       } catch (err) {
-        console.warn(`Attempt ${i + 1}: Unable to fetch organization ID yet.`);
+        console.warn(`Attempt ${i + 1}: Could not fetch organization ID`);
       }
 
       await new Promise(resolve => setTimeout(resolve, interval));
@@ -1297,6 +1295,40 @@ class UniversalFacebookAdsServer {
     }
 
     return organizationId;
+  }
+
+  async resolveUserIdFromSessionOrOrg(sessionUserMap, sessionId) {
+    let user_id = sessionUserMap.get(sessionId);
+    if (user_id) {
+      console.log("✅ Found user_id from session:", user_id);
+      return user_id;
+    }
+
+    console.warn('⚠️ No user_id found in session. Attempting fallback via organization_id input...');
+
+    let organizationId;
+    try {
+      organizationId = await this.waitForOrganizationId();
+    } catch (err) {
+      console.error("❌ Failed to get organization ID:", err.message);
+      throw new Error("User session could not be resolved.");
+    }
+
+    const fallbackUrl = `https://10xer-web-production.up.railway.app/mcp-api/get_latest_session_by_org_id?organization_id=${organizationId}`;
+    console.log(`🌐 Fetching fallback session from: ${fallbackUrl}`);
+
+    const fallbackRes = await fetch(fallbackUrl);
+    if (!fallbackRes.ok) {
+      throw new Error(`❌ HTTP error from fallback API: ${fallbackRes.status} ${fallbackRes.statusText}`);
+    }
+
+    const fallbackData = await fallbackRes.json();
+    if (!fallbackData.success || !fallbackData.user_id) {
+      throw new Error('❌ No valid session found for organization ID.');
+    }
+
+    console.log(`✅ Fallback resolved session_id: ${fallbackData.session_id}`);
+    return fallbackData.session_id;
   }
 
   async executeToolCall({ toolName, args }) {
@@ -1310,56 +1342,58 @@ class UniversalFacebookAdsServer {
     //   console.error("this.currentFacebookAccessToken->", this.currentFacebookAccessToken);
     // }
 
-    let user_id = this.sessionUserMap.get(this.activeSseTransport.sessionId);
-    if (!user_id) {
-      console.warn('⚠️ No user_id found in session. Attempting fallback using IP address...');
+    // let user_id = this.sessionUserMap.get(this.activeSseTransport.sessionId);
+    // if (!user_id) {
+    //   console.warn('⚠️ No user_id found in session. Attempting fallback using IP address...');
 
-      let organizationId;
+    //   let organizationId;
       
-      try {
-        organizationId = await this.waitForOrganizationId();
-      } catch (err) {
-        console.error("Failed to retrieve organization ID:", err.message);
-        // Handle failure or abort
-      }
+    //   try {
+    //     organizationId = await this.waitForOrganizationId();
+    //   } catch (err) {
+    //     console.error("Failed to retrieve organization ID:", err.message);
+    //     // Handle failure or abort
+    //   }
       
-      console.log("Received organization ID from popup:", organizationId);
+    //   console.log("Received organization ID from popup:", organizationId);
 
-      try {
-        const fallbackUrl = `https://10xer-web-production.up.railway.app/mcp-api/get_latest_session_by_org_id?organization_id=${organizationId}`;
-        console.log(`🌐 Fetching fallback session from: ${fallbackUrl}`);
+    //   try {
+    //     const fallbackUrl = `https://10xer-web-production.up.railway.app/mcp-api/get_latest_session_by_org_id?organization_id=${organizationId}`;
+    //     console.log(`🌐 Fetching fallback session from: ${fallbackUrl}`);
 
-        const fallbackRes = await fetch(fallbackUrl);
+    //     const fallbackRes = await fetch(fallbackUrl);
 
-        // Handle non-200 responses
-        if (!fallbackRes.ok) {
-          console.error(`❌ HTTP error from fallback session API: ${fallbackRes.status} ${fallbackRes.statusText}`);
-          throw new Error(`Fallback API responded with status ${fallbackRes.status}`);
-        }
+    //     // Handle non-200 responses
+    //     if (!fallbackRes.ok) {
+    //       console.error(`❌ HTTP error from fallback session API: ${fallbackRes.status} ${fallbackRes.statusText}`);
+    //       throw new Error(`Fallback API responded with status ${fallbackRes.status}`);
+    //     }
 
-        const fallbackData = await fallbackRes.json();
+    //     const fallbackData = await fallbackRes.json();
 
-        // Optional: Log entire fallback response for debugging
-        console.debug('📦 Fallback API response:', fallbackData);
+    //     // Optional: Log entire fallback response for debugging
+    //     console.debug('📦 Fallback API response:', fallbackData);
 
-        if (fallbackData && fallbackData.success && fallbackData.user_id) {
-          user_id = fallbackData.session_id;
-          console.log(`✅ Fallback resolved session_id: ${fallbackData.session_id} from IP.`);
-        } else {
-          console.warn('⚠️ Fallback API did not return a valid user_id.');
-          throw new Error('No valid session found via IP fallback.');
-        }
+    //     if (fallbackData && fallbackData.success && fallbackData.user_id) {
+    //       user_id = fallbackData.session_id;
+    //       console.log(`✅ Fallback resolved session_id: ${fallbackData.session_id} from IP.`);
+    //     } else {
+    //       console.warn('⚠️ Fallback API did not return a valid user_id.');
+    //       throw new Error('No valid session found via IP fallback.');
+    //     }
 
-      } catch (error) {
-        console.error('❌ Fallback session fetch failed:', error.message);
-        throw new Error('User session could not be resolved.');
-      }
-    }
+    //   } catch (error) {
+    //     console.error('❌ Fallback session fetch failed:', error.message);
+    //     throw new Error('User session could not be resolved.');
+    //   }
+    // }
 
-    console.error("Resolved user_id from session or fallback:", user_id);
+    // console.error("Resolved user_id from session or fallback:", user_id);
 
-    await this.fetchLatestFacebookAccessToken(user_id);
-    console.error("this.currentFacebookAccessToken->", this.currentFacebookAccessToken);
+    // await this.fetchLatestFacebookAccessToken(user_id);
+    // console.error("this.currentFacebookAccessToken->", this.currentFacebookAccessToken);
+
+    let user_id;
     
     // Step 2: tool switch
     switch (toolName) {
@@ -1373,21 +1407,87 @@ class UniversalFacebookAdsServer {
         return await facebookCheckAuth(args);
       
       case 'facebook_list_ad_accounts':
+        try {
+          user_id = await this.resolveUserIdFromSessionOrOrg(this.sessionUserMap, this.activeSseTransport.sessionId);
+        } catch (err) {
+          console.error("❌ User ID resolution failed:", err.message);
+          throw new Error("Cannot continue without a valid user session.");
+        }
+
+        console.log("🎯 Resolved user_id:", user_id);
+
+        await this.fetchLatestFacebookAccessToken(user_id);
+        console.log("📘 Facebook access token:", this.currentFacebookAccessToken);
         return await listAdAccounts(args, this.currentFacebookAccessToken);
 
       case 'facebook_fetch_pagination_url':
+        try {
+          user_id = await this.resolveUserIdFromSessionOrOrg(this.sessionUserMap, this.activeSseTransport.sessionId);
+        } catch (err) {
+          console.error("❌ User ID resolution failed:", err.message);
+          throw new Error("Cannot continue without a valid user session.");
+        }
+
+        console.log("🎯 Resolved user_id:", user_id);
+
+        await this.fetchLatestFacebookAccessToken(user_id);
+        console.log("📘 Facebook access token:", this.currentFacebookAccessToken);
         return await fetchPaginationUrl(args, this.currentFacebookAccessToken);
 
       case 'facebook_get_details_of_ad_account':
+        try {
+          user_id = await this.resolveUserIdFromSessionOrOrg(this.sessionUserMap, this.activeSseTransport.sessionId);
+        } catch (err) {
+          console.error("❌ User ID resolution failed:", err.message);
+          throw new Error("Cannot continue without a valid user session.");
+        }
+
+        console.log("🎯 Resolved user_id:", user_id);
+
+        await this.fetchLatestFacebookAccessToken(user_id);
+        console.log("📘 Facebook access token:", this.currentFacebookAccessToken);
         return await getAccountDetails(args, this.currentFacebookAccessToken);
 
       case 'facebook_get_adaccount_insights':
+        try {
+          user_id = await this.resolveUserIdFromSessionOrOrg(this.sessionUserMap, this.activeSseTransport.sessionId);
+        } catch (err) {
+          console.error("❌ User ID resolution failed:", err.message);
+          throw new Error("Cannot continue without a valid user session.");
+        }
+
+        console.log("🎯 Resolved user_id:", user_id);
+
+        await this.fetchLatestFacebookAccessToken(user_id);
+        console.log("📘 Facebook access token:", this.currentFacebookAccessToken);
         return await getAccountInsights(args, this.currentFacebookAccessToken);
 
       case 'facebook_get_activities_by_adaccount':
+        try {
+          user_id = await this.resolveUserIdFromSessionOrOrg(this.sessionUserMap, this.activeSseTransport.sessionId);
+        } catch (err) {
+          console.error("❌ User ID resolution failed:", err.message);
+          throw new Error("Cannot continue without a valid user session.");
+        }
+
+        console.log("🎯 Resolved user_id:", user_id);
+
+        await this.fetchLatestFacebookAccessToken(user_id);
+        console.log("📘 Facebook access token:", this.currentFacebookAccessToken);
         return await getAccountActivities(args, this.currentFacebookAccessToken);
 
       case 'facebook_get_ad_creatives':
+        try {
+          user_id = await this.resolveUserIdFromSessionOrOrg(this.sessionUserMap, this.activeSseTransport.sessionId);
+        } catch (err) {
+          console.error("❌ User ID resolution failed:", err.message);
+          throw new Error("Cannot continue without a valid user session.");
+        }
+
+        console.log("🎯 Resolved user_id:", user_id);
+
+        await this.fetchLatestFacebookAccessToken(user_id);
+        console.log("📘 Facebook access token:", this.currentFacebookAccessToken);
         return await getAdCreatives(args, this.currentFacebookAccessToken);
 
       case 'facebook_get_ad_thumbnails':
