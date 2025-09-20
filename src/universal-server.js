@@ -1317,7 +1317,7 @@ class UniversalFacebookAdsServer {
       let organizationId;
       
       try {
-        organizationId = await waitForOrganizationId();
+        organizationId = await this.waitForOrganizationId();
       } catch (err) {
         console.error("Failed to retrieve organization ID:", err.message);
         // Handle failure or abort
