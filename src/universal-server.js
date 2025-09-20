@@ -1357,7 +1357,13 @@ class UniversalFacebookAdsServer {
     // If this tool needs org ID & auth, prompt the user for org ID before continuing
     if (!authExemptTools.includes(toolName)) {
       // Prompt user for organization ID
-      const organizationId = await this.askOrganizationId();
+      // const organizationId = await this.askOrganizationId();
+      // console.log(`Using organization ID: ${organizationId}`);
+
+      const organizationId = args.organization_id;
+      if (!organizationId) {
+        throw new Error("Organization ID is required for this tool.");
+      }
       console.log(`Using organization ID: ${organizationId}`);
 
       // Then resolve user ID from the session map or fallback (passing org ID)

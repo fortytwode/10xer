@@ -23,7 +23,7 @@ export const TOOL_SCHEMAS = {
   facebook_list_ad_accounts: {
     type: 'object',
     properties: {},
-    required: [],
+    required: ["organization_id"],
     additionalProperties: false,
   },
 
