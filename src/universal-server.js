@@ -1260,6 +1260,45 @@ class UniversalFacebookAdsServer {
   //   }
   // }
 
+  async waitForOrganizationId() {
+    // Open the browser to the Flask input form
+    await open('https://10xer-web-production.up.railway.app/integrations/enter_organization');
+
+    console.log("🔍 Waiting for user to submit organization ID...");
+
+    let organizationId = null;
+    const maxAttempts = 100; // ~5 minutes if interval is 3s
+    const interval = 3000; // 3 seconds
+
+    for (let i = 0; i < maxAttempts; i++) {
+      try {
+        const res = await fetch('https://10xer-web-production.up.railway.app/integrations/enter_organization', {
+          method: 'GET',
+          credentials: 'include', // required if using session cookies
+        });
+
+        if (res.ok) {
+          const data = await res.json();
+          if (data.organization_id) {
+            organizationId = data.organization_id;
+            console.log("✅ Received organization ID:", organizationId);
+            break;
+          }
+        }
+      } catch (err) {
+        console.warn(`Attempt ${i + 1}: Unable to fetch organization ID yet.`);
+      }
+
+      await new Promise(resolve => setTimeout(resolve, interval));
+    }
+
+    if (!organizationId) {
+      throw new Error("❌ Timeout waiting for organization ID input.");
+    }
+
+    return organizationId;
+  }
+
   async executeToolCall({ toolName, args }) {
     console.error("args->", args)
     console.error("args?.user_id->", args?.user_id)
@@ -1276,35 +1315,14 @@ class UniversalFacebookAdsServer {
       console.warn('⚠️ No user_id found in session. Attempting fallback using IP address...');
 
       let organizationId;
-      // Open the popup window to Flask form
-      const popup = window.open(
-        'https://10xer-web-production.up.railway.app/integrations/enter_organization',
-        'EnterOrganization',
-        'width=500,height=600,scrollbars=yes'
-      );
-
-      // Wait for the popup to send us the organization ID via postMessage
-      organizationId = await new Promise((resolve, reject) => {
-        function receiveMessage(event) {
-          // Verify the message origin if needed
-          if (event.origin !== 'https://10xer-web-production.up.railway.app') return;
-          
-          if (event.data.organizationId) {
-            window.removeEventListener('message', receiveMessage);
-            resolve(event.data.organizationId);
-            popup.close();
-          }
-        }
-        window.addEventListener('message', receiveMessage);
-
-        // Optional: timeout if user takes too long
-        setTimeout(() => {
-          window.removeEventListener('message', receiveMessage);
-          reject(new Error('Timeout waiting for organization ID'));
-          popup.close();
-        }, 5 * 60 * 1000); // 5 minutes
-      });
-
+      
+      try {
+        organizationId = await waitForOrganizationId();
+      } catch (err) {
+        console.error("Failed to retrieve organization ID:", err.message);
+        // Handle failure or abort
+      }
+      
       console.log("Received organization ID from popup:", organizationId);
 
       try {
