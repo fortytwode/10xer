@@ -1307,15 +1307,31 @@ class UniversalFacebookAdsServer {
   //   return organizationId;
   // }
 
-  async resolveUserIdFromSessionOrOrg(sessionUserMap, sessionId, organizationId) {
+  async resolveUserIdFromSessionOrOrg(sessionUserMap, sessionId) {
     let user_id = sessionUserMap.get(sessionId);
     if (user_id) {
       console.log("✅ Found user_id from session:", user_id);
       return user_id;
     }
 
-    console.warn('⚠️ No user_id found in session. Attempting fallback via organization_id input...');
+    console.warn('⚠️ No user_id found in session. Attempting fallback via organization_id from Claude API...');
 
+    // STEP 1: Fetch organizations from Claude API
+    const orgsResponse = await fetch('https://claude.ai/api/organizations');
+    if (!orgsResponse.ok) {
+      throw new Error(`❌ Failed to fetch organizations: ${orgsResponse.status} ${orgsResponse.statusText}`);
+    }
+
+    const orgsData = await orgsResponse.json();
+    if (!Array.isArray(orgsData) || orgsData.length === 0) {
+      throw new Error('❌ No organizations found in Claude API response.');
+    }
+
+    // STEP 2: Extract organization UUID
+    const organizationId = orgsData[0].uuid;
+    console.log(`🏢 Using organization_id from Claude API: ${organizationId}`);
+
+    // STEP 3: Use organizationId in fallback URL
     const fallbackUrl = `https://10xer-web-production.up.railway.app/mcp-api/get_latest_session_by_org_id?organization_id=${organizationId}`;
     console.log(`🌐 Fetching fallback session from: ${fallbackUrl}`);
 
@@ -1368,14 +1384,14 @@ class UniversalFacebookAdsServer {
       // const organizationId = await this.askOrganizationId();
       // console.log(`Using organization ID: ${organizationId}`);
 
-      const organizationId = args.organization_id;
-      if (!organizationId) {
-        throw new Error("Organization ID is required for this tool.");
-      }
-      console.log(`Using organization ID: ${organizationId}`);
+      // const organizationId = args.organization_id;
+      // if (!organizationId) {
+      //   throw new Error("Organization ID is required for this tool.");
+      // }
+      // console.log(`Using organization ID: ${organizationId}`);
 
       // Then resolve user ID from the session map or fallback (passing org ID)
-      const userId = await this.resolveUserIdFromSessionOrOrg(this.sessionUserMap, this.activeSseTransport?.sessionId, organizationId);
+      const userId = await this.resolveUserIdFromSessionOrOrg(this.sessionUserMap, this.activeSseTransport?.sessionId);
 
       // Fetch Facebook access token with resolved userId
       await this.fetchLatestFacebookAccessToken(userId);
