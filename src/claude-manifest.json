@@ -34,5 +34,37 @@
       "description": "Facebook business organization ID",
       "required": true
     }
-  }
+  },
+  "tools": [
+    {
+      "name": "facebook_login",
+      "description": "Facebook Ads tool",
+      "title": "Facebook login"
+    },
+    {
+      "name": "facebook_logout",
+      "description": "Facebook Ads tool",
+      "title": "Facebook logout"
+    },
+    {
+      "name": "facebook_check_auth",
+      "description": "Facebook Ads tool",
+      "title": "Facebook check auth"
+    },
+    {
+      "name": "facebook_list_ad_accounts",
+      "description": "List all Facebook ad accounts accessible with the provided credentials",
+      "title": "Facebook list ad accounts"
+    },
+    {
+      "name": "facebook_fetch_pagination_url",
+      "description": "Fetch data from a Facebook Graph API pagination URL",
+      "title": "Facebook fetch pagination url"
+    },
+    {
+      "name": "facebook_get_ad_account_details",
+      "description": "Get details of a specific ad account as per the fields",
+      "title": "Facebook get details of ad account"
+    }
+  ]
 }
