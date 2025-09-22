@@ -1,0 +1,38 @@
+{
+  "schema_version": "v1",
+  "name_for_human": "Facebook Ads Universal Server",
+  "name_for_model": "facebook_ads_universal",
+  "description_for_human": "Access and manage Facebook Ads data through MCP protocol.",
+  "description_for_model": "Server to interface with Facebook Ads APIs via MCP. Requires organization_id.",
+  "auth": {
+    "type": "none"
+  },
+  "api": {
+    "type": "mcp",
+    "mcp_config": {
+      "command": "node",
+      "args": [
+        "${__dirname}/src/universal-server.js",
+        "10xer MCP Server",
+        "https://10xer-web-production.up.railway.app/mcp-api/get_latest_session_by_org_id?organization_id=${user_config.organization_id}",
+        "${user_config.organization_id}"
+      ],
+      "env": {
+        "SERVER_NAME": "10xer MCP Server",
+        "SSE_URL": "https://10xer-web-production.up.railway.app/mcp-api/get_latest_session_by_org_id?organization_id=${user_config.organization_id}",
+        "ORGANIZATION_ID": "${user_config.organization_id}"
+      }
+    }
+  },
+  "logo_url": "https://yourdomain.com/logo.png",
+  "contact_email": "support@yourdomain.com",
+  "legal_info_url": "https://yourdomain.com/legal",
+  "user_config": {
+    "organization_id": {
+      "type": "string",
+      "title": "Organization ID",
+      "description": "Facebook business organization ID",
+      "required": true
+    }
+  }
+}

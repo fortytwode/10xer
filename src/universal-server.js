@@ -28,6 +28,7 @@ import { facebookCheckAuth } from './tools/facebook-check-auth.js';
 // Import schemas
 import { TOOL_SCHEMAS } from './schemas/tool-schemas.js';
 import { CLAUDE_CONNECTOR_MANIFEST } from './claude-connector-manifest.js';
+import NEW_CLAUDE_CONNECTOR_MANIFEST from './claude-manifest.json' assert { type: 'json' };
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { getLocalIPv4 } from './utils/network.js';
@@ -370,6 +371,10 @@ class UniversalFacebookAdsServer {
     // Claude tool endpoints
     this.apiServer.get('/claude/manifest', (_req, res) => {
       res.json(CLAUDE_CONNECTOR_MANIFEST);
+    });
+
+    this.apiServer.get('/claude-manifest', (_req, res) => {
+      res.json(NEW_CLAUDE_CONNECTOR_MANIFEST);
     });
 
     // Gemini Function Calling endpoints  
