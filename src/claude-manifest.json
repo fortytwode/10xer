@@ -14,12 +14,12 @@
       "args": [
         "${__dirname}/src/universal-server.js",
         "10xer MCP Server",
-        "https://10xer-web-production.up.railway.app/mcp-api/get_latest_session_by_org_id?organization_id=${user_config.organization_id}",
+        "https://10xer-production.up.railway.app/mcp",
         "${user_config.organization_id}"
       ],
       "env": {
         "SERVER_NAME": "10xer MCP Server",
-        "SSE_URL": "https://10xer-web-production.up.railway.app/mcp-api/get_latest_session_by_org_id?organization_id=${user_config.organization_id}",
+        "SSE_URL": "https://10xer-production.up.railway.app/mcp",
         "ORGANIZATION_ID": "${user_config.organization_id}"
       }
     }

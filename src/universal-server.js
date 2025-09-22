@@ -152,6 +152,9 @@ class UniversalFacebookAdsServer {
   setupApiServer() {
     this.apiServer.get('/mcp', async (req, res) => {
       try {
+        this.apiServer.get('/claude-manifest', (_req, res) => {
+          res.json(NEW_CLAUDE_CONNECTOR_MANIFEST);
+        });
         this.activeSseTransport = new SSEServerTransport('/mcp', res);
         await this.mcpServer.connect(this.activeSseTransport);
       } catch (err) {
@@ -1505,9 +1508,6 @@ class UniversalFacebookAdsServer {
     } else if (mode === 'both') {
       const port = parseInt(process.env.PORT || '3003');
       this.startAPI(port);
-      this.apiServer.get('/claude-manifest', (_req, res) => {
-        res.json(NEW_CLAUDE_CONNECTOR_MANIFEST);
-      });
       await this.startMCP();
     } else {
       // Default MCP mode for backward compatibility
