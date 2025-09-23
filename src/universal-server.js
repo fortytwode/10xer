@@ -1311,28 +1311,84 @@ class UniversalFacebookAdsServer {
   //   return organizationId;
   // }
 
-  async resolveUserIdFromSessionOrOrg(sessionUserMap, sessionId) {
+  // ========== Prompt user for org ID ==========
+  async askOrganizationId() {
+    await sendMessageToUser({
+      type: 'text',
+      text: '🔐 Please enter your **Organization ID** to continue:'
+    });
+
+    const response = await this.waitForUserResponse();
+    const orgId = response?.text?.trim();
+
+    if (!orgId) {
+      throw new Error("❌ No organization ID provided by the user.");
+    }
+
+    console.log(`📥 User provided organization ID: ${orgId}`);
+    return orgId;
+  }
+
+  // ========== Send message to user ==========
+  async sendMessageToUser(message) {
+    if (!this.activeSseTransport || !this.activeSseTransport.sessionId) {
+      throw new Error("No active session to send message to.");
+    }
+    const sessionId = this.activeSseTransport.sessionId;
+
+    // Example: emit/send message to user session — adapt to your system
+    this.messageBus.emit('send_message', {
+      sessionId,
+      content: message,
+      timestamp: Date.now(),
+    });
+
+    console.log(`Sent message to user (session: ${sessionId}):`, message.text);
+  }
+
+  // ========== Wait for user input ==========
+  async waitForUserResponse(timeoutMs = 60000) {
+    return new Promise((resolve, reject) => {
+      if (!this.activeSseTransport || !this.activeSseTransport.sessionId) {
+        return reject(new Error("No active session for user response."));
+      }
+      const sessionId = this.activeSseTransport.sessionId;
+
+      // Handler for user messages
+      const onUserMessage = (msg) => {
+        if (msg.sessionId === sessionId) {
+          this.messageBus.off('user_message', onUserMessage);
+          resolve(msg.content);
+        }
+      };
+
+      // Listen for user message events (adapt to your event emitter)
+      this.messageBus.on('user_message', onUserMessage);
+
+      // Timeout if no response
+      setTimeout(() => {
+        this.messageBus.off('user_message', onUserMessage);
+        reject(new Error("User response timed out."));
+      }, timeoutMs);
+    });
+  }
+
+  // ========== Resolve user ID using session map or fallback with org ID ==========
+  async resolveUserIdFromSessionOrOrg(sessionUserMap, sessionId, organizationId) {
     let user_id = sessionUserMap.get(sessionId);
     if (user_id) {
       console.log("✅ Found user_id from session:", user_id);
       return user_id;
     }
 
-    console.warn('⚠️ No user_id found in session. Attempting fallback via organization_id from Claude API...');
+    console.warn('⚠️ No user_id found in session. Using organization_id fallback...');
 
-    // STEP 1: Fetch organizations from Claude API
-    const userSession = await fetch('https://10xer-production.up.railway.app/getSession');
-    console.log("userSession->", userSession);
+    if (!organizationId) {
+      throw new Error("Organization ID is required for fallback resolution.");
+    }
 
-    const userSessionData = await userSession.json();
-    console.log("userSessionData->", userSessionData);
-
-    // STEP 2: Extract organization UUID
-    // const organizationId = orgsData[0].uuid;
-    // console.log(`🏢 Using organization_id from Claude API: ${organizationId}`);
-
-    // STEP 3: Use organizationId in fallback URL
-    const fallbackUrl = `https://10xer-web-production.up.railway.app/mcp-api/get_latest_session_by_session_id?session_id=${userSessionData.cookie}`;
+    // Use organizationId in fallback URL
+    const fallbackUrl = `https://10xer-web-production.up.railway.app/mcp-api/get_latest_session_by_org_id?organization_id=${organizationId}`;
     console.log(`🌐 Fetching fallback session from: ${fallbackUrl}`);
 
     const fallbackRes = await fetch(fallbackUrl);
@@ -1345,22 +1401,8 @@ class UniversalFacebookAdsServer {
       throw new Error('❌ No valid session found for organization ID.');
     }
 
-    console.log(`✅ Fallback resolved session_id: ${fallbackData.session_id}`);
-    return fallbackData.session_id;
-  }
-
-  async askOrganizationId() {
-    const rl = readline.createInterface({
-      input: process.stdin,
-      output: process.stdout
-    });
-    
-    return new Promise((resolve) => {
-      rl.question('Please enter your organization ID: ', (orgId) => {
-        rl.close();
-        resolve(orgId.trim());
-      });
-    });
+    console.log(`✅ Fallback resolved user_id: ${fallbackData.user_id}`);
+    return fallbackData.user_id;
   }
 
   async executeToolCall({ toolName, args }) {
@@ -1378,24 +1420,27 @@ class UniversalFacebookAdsServer {
     // Tools that don't require org/user ID or Facebook token
     const authExemptTools = ['facebook_login', 'facebook_logout', 'facebook_check_auth'];
 
-    // If this tool needs org ID & auth, prompt the user for org ID before continuing
     if (!authExemptTools.includes(toolName)) {
-      // Prompt user for organization ID
-      // const organizationId = await this.askOrganizationId();
-      // console.log(`Using organization ID: ${organizationId}`);
+      let organizationId = args.organization_id;
 
-      // const organizationId = args.organization_id;
-      // if (!organizationId) {
-      //   throw new Error("Organization ID is required for this tool.");
-      // }
-      // console.log(`Using organization ID: ${organizationId}`);
+      if (!organizationId) {
+        // Prompt user via chat to enter org ID
+        organizationId = await this.askOrganizationId();
+        if (!organizationId) {
+          throw new Error("❌ Organization ID is required but was not provided.");
+        }
+      }
 
-      // Then resolve user ID from the session map or fallback (passing org ID)
-      const userId = await this.resolveUserIdFromSessionOrOrg(this.sessionUserMap, this.activeSseTransport?.sessionId);
+      // Resolve user ID with organization ID provided
+      const userId = await resolveUserIdFromSessionOrOrg(
+        this.sessionUserMap,
+        this.activeSseTransport?.sessionId,
+        organizationId
+      );
 
-      // Fetch Facebook access token with resolved userId
-      await this.fetchLatestFacebookAccessToken(userId);
-      console.error("this.currentFacebookAccessToken->", this.currentFacebookAccessToken);
+      // Fetch Facebook token for resolved user
+      await fetchLatestFacebookAccessToken(userId);
+      console.log("this.currentFacebookAccessToken->", this.currentFacebookAccessToken);
     }
 
     

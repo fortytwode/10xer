@@ -22,8 +22,13 @@ export const TOOL_SCHEMAS = {
 
   facebook_list_ad_accounts: {
     type: 'object',
-    properties: {},
-    required: [],
+   "properties": {
+      "organization_id": {
+        "type": "string",
+        "description": "Organization ID required for this tool"
+      }
+    },
+    "required": ["organization_id"],
     additionalProperties: false,
   },
 
