@@ -32,15 +32,19 @@ export const TOOL_SCHEMAS = {
     additionalProperties: false,
   },
 
-  facebook_fetch_pagination_url: {
+facebook_fetch_pagination_url: {
     type: 'object',
     properties: {
       url: {
         type: 'string',
         description: 'The complete pagination URL',
       },
+      organization_id: {
+        type: 'string',
+        description: 'Organization ID of the current user',
+      },
     },
-    required: ['url'],
+    required: ['url', 'organization_id'],
     additionalProperties: false,
   },
 
@@ -54,10 +58,14 @@ export const TOOL_SCHEMAS = {
       fields: {
         type: 'array',
         items: { type: 'string' },
-        description: 'Fields to retrieve. Available: name, business_name, age, account_status, balance, amount_spent, attribution_spec, account_id, business, business_city, brand_safety_content_filter_levels, currency, created_time, id',
+        description: 'Fields to retrieve.',
+      },
+      organization_id: {
+        type: 'string',
+        description: 'Organization ID of the current user',
       },
     },
-    required: ['act_id'],
+    required: ['act_id', 'organization_id'],
     additionalProperties: false,
   },
 
@@ -124,8 +132,12 @@ export const TOOL_SCHEMAS = {
         type: ['string', 'number'],
         description: 'Time aggregation period. Use 1 for daily, 7 for weekly, monthly for monthly breakdowns',
       },
+      organization_id: {
+        type: 'string',
+        description: 'Organization ID of the current user',
+      },
     },
-    required: ['act_id', 'fields'],
+    required: ['act_id', 'fields', 'organization_id'],
     additionalProperties: false,
   },
 
@@ -169,8 +181,12 @@ export const TOOL_SCHEMAS = {
         type: 'string',
         description: 'Pagination cursor',
       },
+      organization_id: {
+        type: 'string',
+        description: 'Organization ID of the current user',
+      },
     },
-    required: ['act_id'],
+    required: ['act_id', 'organization_id'],
     additionalProperties: false,
   },
 
@@ -188,9 +204,13 @@ export const TOOL_SCHEMAS = {
         type: 'boolean',
         default: true,
         description: 'Whether to download and embed images as base64'
-      }
+      },
+      organization_id: {
+        type: 'string',
+        description: 'Organization ID of the current user',
+      },
     },
-    required: ['ad_ids'],
+    required: ['ad_ids', 'organization_id'],
     additionalProperties: false,
   },
 
