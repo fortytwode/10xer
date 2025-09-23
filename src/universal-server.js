@@ -1432,14 +1432,14 @@ class UniversalFacebookAdsServer {
       }
 
       // Resolve user ID with organization ID provided
-      const userId = await resolveUserIdFromSessionOrOrg(
+      const userId = await this.resolveUserIdFromSessionOrOrg(
         this.sessionUserMap,
         this.activeSseTransport?.sessionId,
         organizationId
       );
 
       // Fetch Facebook token for resolved user
-      await fetchLatestFacebookAccessToken(userId);
+      await this.fetchLatestFacebookAccessToken(userId);
       console.log("this.currentFacebookAccessToken->", this.currentFacebookAccessToken);
     }
 
