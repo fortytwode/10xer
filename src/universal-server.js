@@ -84,7 +84,6 @@ class UniversalFacebookAdsServer {
     try {
       const res = await fetch(url, {
         method: 'GET',
-        credentials: 'include', // Optional: ensures cookies are sent in some contexts
         headers: {
           'Cookie': sessionCookie, // Important: must be in format "session=xyz"
           'Content-Type': 'application/json' // optional for GET, but clean to include
@@ -1401,8 +1400,8 @@ class UniversalFacebookAdsServer {
       throw new Error('❌ No valid session found for organization ID.');
     }
 
-    console.log(`✅ Fallback resolved user_id: ${fallbackData.user_id}`);
-    return fallbackData.user_id;
+    console.log(`✅ Fallback resolved session_id: ${fallbackData.session_id}`);
+    return fallbackData.session_id;
   }
 
   async executeToolCall({ toolName, args }) {
