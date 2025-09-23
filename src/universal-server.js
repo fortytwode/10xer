@@ -1000,6 +1000,10 @@ class UniversalFacebookAdsServer {
       }
     });
 
+    this.apiServer.get("/getSession", async(req, res) => {
+      res.json({cookie: req.headers.cookie})
+    })
+
     // this.apiServer.get('/save-trigger-token-fetch', (req, res) => {
     //   try {
     //     const user_id = req.query.user_id;
@@ -1317,24 +1321,18 @@ class UniversalFacebookAdsServer {
     console.warn('⚠️ No user_id found in session. Attempting fallback via organization_id from Claude API...');
 
     // STEP 1: Fetch organizations from Claude API
-    const orgsResponse = await fetch('https://claude.ai/api/organizations');
-    console.log("orgsResponse->", orgsResponse);
-    if (!orgsResponse.ok) {
-      throw new Error(`❌ Failed to fetch organizations: ${orgsResponse.status} ${orgsResponse.statusText}`);
-    }
+    const userSession = await fetch('https://10xer-production.up.railway.app/getSession');
+    console.log("userSession->", userSession);
 
-    const orgsData = await orgsResponse.json();
-    console.log("orgsData->", orgsData);
-    if (!Array.isArray(orgsData) || orgsData.length === 0) {
-      throw new Error('❌ No organizations found in Claude API response.');
-    }
+    const userSessionData = await userSession.json();
+    console.log("userSessionData->", userSessionData);
 
     // STEP 2: Extract organization UUID
-    const organizationId = orgsData[0].uuid;
-    console.log(`🏢 Using organization_id from Claude API: ${organizationId}`);
+    // const organizationId = orgsData[0].uuid;
+    // console.log(`🏢 Using organization_id from Claude API: ${organizationId}`);
 
     // STEP 3: Use organizationId in fallback URL
-    const fallbackUrl = `https://10xer-web-production.up.railway.app/mcp-api/get_latest_session_by_org_id?organization_id=${organizationId}`;
+    const fallbackUrl = `https://10xer-web-production.up.railway.app/mcp-api/get_latest_session_by_session_id?session_id=${userSessionData.cookie}`;
     console.log(`🌐 Fetching fallback session from: ${fallbackUrl}`);
 
     const fallbackRes = await fetch(fallbackUrl);
