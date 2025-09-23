@@ -1318,11 +1318,13 @@ class UniversalFacebookAdsServer {
 
     // STEP 1: Fetch organizations from Claude API
     const orgsResponse = await fetch('https://claude.ai/api/organizations');
+    console.log("orgsResponse->", orgsResponse);
     if (!orgsResponse.ok) {
       throw new Error(`❌ Failed to fetch organizations: ${orgsResponse.status} ${orgsResponse.statusText}`);
     }
 
     const orgsData = await orgsResponse.json();
+    console.log("orgsData->", orgsData);
     if (!Array.isArray(orgsData) || orgsData.length === 0) {
       throw new Error('❌ No organizations found in Claude API response.');
     }
