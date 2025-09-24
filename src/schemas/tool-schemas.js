@@ -1,24 +1,24 @@
 export const TOOL_SCHEMAS = {
-  facebook_login: {
-    type: 'object',
-    properties: {},
-    required: [],
-    additionalProperties: false,
-  },
+  // facebook_login: {
+  //   type: 'object',
+  //   properties: {},
+  //   required: [],
+  //   additionalProperties: false,
+  // },
 
-  facebook_logout: {
-    type: 'object',
-    properties: {},
-    required: [],
-    additionalProperties: false,
-  },
+  // facebook_logout: {
+  //   type: 'object',
+  //   properties: {},
+  //   required: [],
+  //   additionalProperties: false,
+  // },
 
-  facebook_check_auth: {
-    type: 'object', 
-    properties: {},
-    required: [],
-    additionalProperties: false,
-  },
+  // facebook_check_auth: {
+  //   type: 'object', 
+  //   properties: {},
+  //   required: [],
+  //   additionalProperties: false,
+  // },
 
   facebook_list_ad_accounts: {
     type: 'object',

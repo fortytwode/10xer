@@ -1417,42 +1417,42 @@ class UniversalFacebookAdsServer {
 
     let user_id;
     // Tools that don't require org/user ID or Facebook token
-    const authExemptTools = ['facebook_login', 'facebook_logout', 'facebook_check_auth'];
+    // const authExemptTools = ['facebook_login', 'facebook_logout', 'facebook_check_auth'];
 
-    if (!authExemptTools.includes(toolName)) {
-      let organizationId = args.organization_id;
+    // if (!authExemptTools.includes(toolName)) {
+    let organizationId = args.organization_id;
 
+    if (!organizationId) {
+      // Prompt user via chat to enter org ID
+      organizationId = await this.askOrganizationId();
       if (!organizationId) {
-        // Prompt user via chat to enter org ID
-        organizationId = await this.askOrganizationId();
-        if (!organizationId) {
-          throw new Error("❌ Organization ID is required but was not provided.");
-        }
+        throw new Error("❌ Organization ID is required but was not provided.");
       }
-
-      // Resolve user ID with organization ID provided
-      const userId = await this.resolveUserIdFromSessionOrOrg(
-        this.sessionUserMap,
-        this.activeSseTransport?.sessionId,
-        organizationId
-      );
-
-      // Fetch Facebook token for resolved user
-      await this.fetchLatestFacebookAccessToken(userId);
-      console.log("this.currentFacebookAccessToken->", this.currentFacebookAccessToken);
     }
+
+    // Resolve user ID with organization ID provided
+    const userId = await this.resolveUserIdFromSessionOrOrg(
+      this.sessionUserMap,
+      this.activeSseTransport?.sessionId,
+      organizationId
+    );
+
+    // Fetch Facebook token for resolved user
+    await this.fetchLatestFacebookAccessToken(userId);
+    console.log("this.currentFacebookAccessToken->", this.currentFacebookAccessToken);
+    // }
 
     
     // Step 2: tool switch
     switch (toolName) {
-      case 'facebook_login':
-        return await facebookLogin(args);
+      // case 'facebook_login':
+      //   return await facebookLogin(args);
 
-      case 'facebook_logout':
-        return await facebookLogout(args);
+      // case 'facebook_logout':
+      //   return await facebookLogout(args);
 
-      case 'facebook_check_auth':
-        return await facebookCheckAuth(args);
+      // case 'facebook_check_auth':
+      //   return await facebookCheckAuth(args);
       
       case 'facebook_list_ad_accounts':
         return await listAdAccounts(args, this.currentFacebookAccessToken);
