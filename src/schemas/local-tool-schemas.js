@@ -117,7 +117,7 @@ export const TOOL_SCHEMAS = {
       },
       time_increment: {
         type: ['string', 'number'],
-        description: 'Time aggregation period. Use 1 for daily, 7 for weekly, monthly for monthly breakdowns',
+        description: 'Time aggregation period. Valid values: 1 (daily), 7 (weekly), "monthly" (monthly calendar breakdown), "all_days" (total period). Examples: 1, "monthly"',
       },
     },
     required: ['act_id', 'fields'],
