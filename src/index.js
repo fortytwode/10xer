@@ -25,7 +25,7 @@ import { getAccountActivities } from './tools/get-account-activities.js';
 import { getAdCreatives } from './tools/get-ad-creatives.js';
 import { TokenStorage } from './auth/token-storage.js';
 
-import { TOOL_SCHEMAS } from './schemas/tool-schemas.js';
+import { TOOL_SCHEMAS } from './schemas/local-tool-schemas.js';
 import { CLAUDE_CONNECTOR_MANIFEST } from './claude-connector-manifest.js';
 
 dotenv.config({ path: new URL('../.env', import.meta.url) });
@@ -37,7 +37,7 @@ class FacebookAdsMCPServer {
     this.apiKey = apiKey;
 
     this.apiBaseUrl = this.sseUrl.replace(/\/sse$/, '');
-    this.facebookAccessToken = null;
+    this.facebookAccessToken = null; // placeholder
 
     this.server = new Server({
       name: this.serverName || process.env.MCP_SERVER_NAME || 'facebook-ads-mcp',
@@ -46,6 +46,7 @@ class FacebookAdsMCPServer {
       capabilities: { tools: {} },
     });
 
+    this.fetchFacebookAccessToken();
     this.setupToolHandlers();
   }
 
@@ -116,42 +117,42 @@ class FacebookAdsMCPServer {
     });
 
     // Claude tool endpoints
-    app.get('/claude/manifest', (_req, res) => {
-      res.json(CLAUDE_CONNECTOR_MANIFEST);
-    });
+    // app.get('/claude/manifest', (_req, res) => {
+    //   res.json(CLAUDE_CONNECTOR_MANIFEST);
+    // });
 
-    app.get('/claude/auth/status', (_req, res) => {
-      const hasToken = !!this.facebookAccessToken;
-      res.json({
-        authenticated: hasToken,
-        message: hasToken ? 'Facebook token available' : 'No Facebook token found',
-      });
-    });
+    // app.get('/claude/auth/status', (_req, res) => {
+    //   const hasToken = !!this.facebookAccessToken;
+    //   res.json({
+    //     authenticated: hasToken,
+    //     message: hasToken ? 'Facebook token available' : 'No Facebook token found',
+    //   });
+    // });
 
-    app.post('/claude/tools/:toolName', async (req, res) => {
-      try {
-        const toolName = req.params.toolName;
-        const args = req.body || {};
+    // app.post('/claude/tools/:toolName', async (req, res) => {
+    //   try {
+    //     const toolName = req.params.toolName;
+    //     const args = req.body || {};
 
-        const toolMap = {
-          'facebook_list_ad_accounts': listAdAccounts,
-          'facebook_get_adaccount_insights': getAccountInsights,
-          'facebook_get_ad_creatives': getAdCreatives,
-          'facebook_get_details_of_ad_account': getAccountDetails,
-          'facebook_get_activities_by_adaccount': getAccountActivities,
-        };
+    //     const toolMap = {
+    //       'facebook_list_ad_accounts': listAdAccounts,
+    //       'facebook_get_adaccount_insights': getAccountInsights,
+    //       'facebook_get_ad_creatives': getAdCreatives,
+    //       'facebook_get_details_of_ad_account': getAccountDetails,
+    //       'facebook_get_activities_by_adaccount': getAccountActivities,
+    //     };
 
-        const toolFunc = toolMap[toolName];
-        if (!toolFunc) {
-          return res.status(404).json({ error: `Tool ${toolName} not found` });
-        }
+    //     const toolFunc = toolMap[toolName];
+    //     if (!toolFunc) {
+    //       return res.status(404).json({ error: `Tool ${toolName} not found` });
+    //     }
 
-        const result = await toolFunc(args, this.facebookAccessToken);
-        res.json(result);
-      } catch (err) {
-        res.status(500).json({ error: err.message });
-      }
-    });
+    //     const result = await toolFunc(args, this.facebookAccessToken);
+    //     res.json(result);
+    //   } catch (err) {
+    //     res.status(500).json({ error: err.message });
+    //   }
+    // });
 
     // ✅ Create raw HTTP server for SSE + Express
     const httpServer = http.createServer((req, res) => {
@@ -169,9 +170,9 @@ class FacebookAdsMCPServer {
 
     const port = process.env.PORT || 3000;
     httpServer.listen(port, () => {
-      console.log(`🌍 MCP server running at http://localhost:${port}`);
-      console.log(`🔗 Claude manifest: http://localhost:${port}/.well-known/claude-manifest.json`);
-      console.log(`🔗 SSE endpoint: http://localhost:${port}/mcp`);
+      // console.log(`🌍 MCP server running at http://localhost:${port}`);
+      // console.log(`🔗 Claude manifest: http://localhost:${port}/.well-known/claude-manifest.json`);
+      // console.log(`🔗 SSE endpoint: http://localhost:${port}/mcp`);
     });
   }
 }
