@@ -46,8 +46,8 @@
     "user_config": {
       "api_key": {
         "type": "string",
-        "title": "10xer MCP Live Server API Key",
-        "description": "Enter your API key generated from the 10xer MCP Server integration page. Visit https://10xer-web-production.up.railway.app/integrations/integrations to create or manage your keys.",
+        "title": "10xer MCP API Key",
+        "description": "Enter your API key for the 10xer MCP Server. This enables OAuth authentication with Facebook.",
         "sensitive": true,
         "required": true
       }

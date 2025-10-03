@@ -27,7 +27,7 @@ export const ValidationSchemas = {
     sort: z.string().optional(),
     after: z.string().optional(),
     before: z.string().optional(),
-    time_increment: z.union([z.string(), z.number()]).optional(),
+    time_increment: z.union([z.string(), z.number()]).nullable().optional(),
   }),
 
   accountActivities: z.object({

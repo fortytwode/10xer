@@ -105,6 +105,10 @@ export const CLAUDE_CONNECTOR_MANIFEST = {
                 "value": {"type": "string"}
               }
             }
+          },
+          "time_increment": {
+            "type": ["string", "number"],
+            "description": "Time aggregation period. Valid values: 1 (daily), 7 (weekly), 'monthly' (monthly calendar breakdown), 'all_days' (total period). Examples: 1, 'monthly'"
           }
         },
         "required": ["act_id", "fields"]

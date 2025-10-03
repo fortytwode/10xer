@@ -2,6 +2,7 @@
 
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { SSEServerTransport } from '@modelcontextprotocol/sdk/server/sse.js';
+import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js';
 import dotenv from 'dotenv';
 
@@ -22,6 +23,7 @@ import { getAccountDetails } from './tools/get-account-details.js';
 import { getAccountInsights } from './tools/get-account-insights.js';
 import { getAccountActivities } from './tools/get-account-activities.js';
 import { getAdCreatives } from './tools/get-ad-creatives.js';
+import { TokenStorage } from './auth/token-storage.js';
 
 import { TOOL_SCHEMAS } from './schemas/tool-schemas.js';
 import { CLAUDE_CONNECTOR_MANIFEST } from './claude-connector-manifest.js';
