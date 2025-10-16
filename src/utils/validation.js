@@ -27,7 +27,8 @@ export const ValidationSchemas = {
     sort: z.string().optional(),
     after: z.string().optional(),
     before: z.string().optional(),
-    time_increment: z.union([z.string(), z.number()]).nullable().optional(),
+    time_increment: z.union([z.enum(['daily','weekly','monthly']), 
+    z.number().int().positive()]).nullable().transform((val) => val ?? 'monthly'), // null → 'monthly'
   }),
 
   accountActivities: z.object({
