@@ -13,6 +13,7 @@ export class FacebookAPIClient {
     this.client = axios.create({
       baseURL: `${this.baseURL}/${this.version}`,
       timeout: 30000,
+      maxRedirects: 0,
     });
   }
 
@@ -29,6 +30,10 @@ export class FacebookAPIClient {
         actualParams = methodOrParams || {};
       }
 
+      if (!/^\/[A-Za-z0-9_-]+(?:\/[A-Za-z0-9_-]+)*$/.test(endpoint) ||
+          new URL(endpoint, this.baseURL).origin !== new URL(this.baseURL).origin) {
+        throw new Error('Expected a relative Graph resource path.');
+      }
       const config = {
         method: method.toLowerCase(),
         url: endpoint,
@@ -36,13 +41,13 @@ export class FacebookAPIClient {
 
       if (method.toUpperCase() === 'GET') {
         config.params = {
-          access_token: this.accessToken,
           ...actualParams,
+          access_token: this.accessToken,
         };
       } else {
         config.data = {
-          access_token: this.accessToken,
           ...actualParams,
+          access_token: this.accessToken,
         };
       }
 
@@ -54,8 +59,18 @@ export class FacebookAPIClient {
   }
 
   async makeRequestFromFullURL(url) {
+    const page = new URL(url);
+    if (page.origin !== 'https://graph.facebook.com' || page.username || page.password || page.hash) {
+      throw new Error('Expected a Facebook Graph pagination URL.');
+    }
+    // Authorize this page as the current account, using the cursor returned by Graph.
+    page.searchParams.delete('access_token');
     try {
-      const response = await axios.get(url);
+      const response = await this.client.get(page.href, {
+        headers: { Authorization: `Bearer ${this.accessToken}` },
+        maxRedirects: 0,
+        maxContentLength: 8 * 1024 * 1024,
+      });
       return response.data;
     } catch (error) {
       this.handleAPIError(error);

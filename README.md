@@ -12,14 +12,8 @@ A Model Context Protocol (MCP) server that provides Facebook Ads functionality f
 npm install -g facebook-ads-mcp-server
 ```
 
-### 2. Create Facebook Developer App
-1. Go to [Facebook Developers](https://developers.facebook.com/apps/)
-2. Create a new app or use existing one
-3. Add "Facebook Login" product
-4. Configure OAuth settings:
-   - **Client OAuth Login**: ON
-   - **Web OAuth Login**: ON  
-   - **Valid OAuth Redirect URIs**: `http://localhost:3002/auth/callback`
+### 2. Connect your account
+Sign in to 10xer, connect Facebook on the Integrations page, and copy the API key from your dashboard. Set ACCOUNT_SERVICE_ORIGIN to the HTTPS origin of the dashboard that issued the key after confirming its ownership. The client checks that setting before sending any remote account credential. If you used an older key, sign in and replace it in your extension settings.
 
 ### 3. Configure Claude Desktop
 Add this to your Claude Desktop MCP settings:
@@ -30,9 +24,8 @@ Add this to your Claude Desktop MCP settings:
     "facebook-ads": {
       "command": "facebook-ads-mcp",
       "env": {
-        "FACEBOOK_APP_ID": "your_facebook_app_id",
-        "FACEBOOK_APP_SECRET": "your_facebook_app_secret",
-        "FACEBOOK_REDIRECT_URI": "http://localhost:3002/auth/callback"
+        "API_KEY": "your_10xer_dashboard_key",
+        "ACCOUNT_SERVICE_ORIGIN": "your_verified_dashboard_origin"
       }
     }
   }
@@ -410,7 +403,7 @@ facebook-ads-mcp/
 ### Troubleshooting
 
 **Server not starting?**
-- Ensure Node.js 18+ is installed
+- Ensure Node.js 20 or newer is installed
 - Verify the access token is valid
 - Check Claude Desktop logs
 

@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 import { spawn } from 'child_process';
-import { setTimeout } from 'timers/promises';
+import { setTimeout as delay } from 'timers/promises';
 
 class MCPTester {
   constructor() {
@@ -23,7 +23,7 @@ class MCPTester {
     });
 
     // Wait for server to initialize
-    await setTimeout(1000);
+    await delay(1000);
     
     if (this.server.killed) {
       throw new Error('Server failed to start');
@@ -212,6 +212,7 @@ class MCPTester {
       await this.testInputValidation();
       
     } catch (error) {
+      this.testResults.push({ test: 'Test suite', status: 'FAIL' });
       console.error('Test suite failed:', error);
     } finally {
       if (this.server) {
@@ -259,7 +260,7 @@ if (!process.env.FACEBOOK_ACCESS_TOKEN) {
 const tester = new MCPTester();
 tester.runAllTests().then(() => {
   tester.printResults();
-  process.exit(0);
+  process.exitCode = tester.testResults.some(result => result.status === 'FAIL') ? 1 : 0;
 }).catch((error) => {
   console.error('Test execution failed:', error);
   process.exit(1);

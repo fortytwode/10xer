@@ -21,23 +21,17 @@ import { getAccountInsights } from './tools/get-account-insights.js';
 import { getAccountActivities } from './tools/get-account-activities.js';
 import { getAdCreatives } from './tools/get-ad-creatives.js';
 // import { getAdThumbnailsEmbedded } from './tools/get-ad-thumbnails-embedded.js';
-import { facebookLogin } from './tools/facebook-login.js';
-import { facebookLogout } from './tools/facebook-logout.js';
-import { facebookCheckAuth } from './tools/facebook-check-auth.js';
-
 // Import schemas
 import { TOOL_SCHEMAS } from './schemas/tool-schemas.js';
 import { CLAUDE_CONNECTOR_MANIFEST } from './claude-connector-manifest.js';
-import NEW_CLAUDE_CONNECTOR_MANIFEST from './claude-manifest.json' assert { type: 'json' };
+import { createRequire } from 'node:module';
+import { createHash } from 'node:crypto';
+import { parseAccountBearer, getAccountFacebookToken } from './auth/account-key.js';
+
+const NEW_CLAUDE_CONNECTOR_MANIFEST = createRequire(import.meta.url)('./claude-manifest.json');
 import path from 'path';
+import { realpathSync } from 'node:fs';
 import { fileURLToPath } from 'url';
-import { getLocalIPv4 } from './utils/network.js';
-
-import { getClaudeSessionCookie } from "./utils/claudeCookies.js";
-import open from 'open';
-
-import readline from 'readline';
-
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 // Load environment variables
@@ -47,175 +41,39 @@ dotenv.config({ path: new URL('../.env', import.meta.url) });
  * Universal Facebook Ads Server
  * Supports MCP, OpenAI Function Calling, and Gemini Function Calling
  */
-class UniversalFacebookAdsServer {
+export class UniversalFacebookAdsServer {
   constructor() {
     this.adapters = {
       mcp: new MCPAdapter(),
       openai: new OpenAIAdapter(), 
       gemini: new GeminiAdapter(),
-      facebookAccessToken: null,
-      user_id: null,
-      currentFacebookAccessToken: null
     };
-
-    // Initialize MCP server (existing functionality)
-    this.mcpServer = new Server({
-      name: process.env.MCP_SERVER_NAME || 'facebook-ads-universal',
-      version: process.env.MCP_SERVER_VERSION || '2.0.0',
-    }, {
-      capabilities: {
-        tools: {},
-      },
-    });
-
-    this.facebookAccessTokens = {}; // Example: { "user_id1": "token1", "user_id2": "token2" }
-    this.user_id = null
-    this.currentFacebookAccessToken = null
-    this.sessionUserMap = new Map(); // sessionId -> user_id
-
-    // Initialize Express server for API endpoints
+    this.sseSessions = new Map();
     this.apiServer = express();
     this.setupApiServer();
-    this.setupMCPHandlers();
   }
 
-  async fetchLatestFacebookAccessToken(sessionCookie) {
-    const url = `https://10xer-web-production.up.railway.app/mcp-api/facebook_token_by_user`;
-    try {
-      const res = await fetch(url, {
-        method: 'GET',
-        headers: {
-          'Cookie': sessionCookie, // Important: must be in format "session=xyz"
-          'Content-Type': 'application/json' // optional for GET, but clean to include
-        }
-      });
-
-      if (!res.ok) {
-        throw new Error(`Failed to fetch Facebook token: ${res.status}`);
-      }
-
-      const data = await res.json();
-      if (data.success && data.facebook_access_token) {
-        this.currentFacebookAccessToken = data.facebook_access_token;
-        console.error('✅ Facebook access token fetched:', this.currentFacebookAccessToken.slice(0, 10) + '...');
-      } else {
-        throw new Error('Token not present in response');
-      }
-    } catch (err) {
-      console.error('❌ Error fetching Facebook token:', err.message);
-      throw err;
-    }
-  }
-
-  async fetchFacebookAccessToken(userId) {
-    // For Claude.ai compatibility, use environment variable when no user auth available
-    if (!userId && process.env.FACEBOOK_ACCESS_TOKEN) {
-      this.currentFacebookAccessToken = process.env.FACEBOOK_ACCESS_TOKEN;
-      console.error('✅ Using environment Facebook access token');
-      return;
-    }
-
-    // Try to fetch user-specific token from external API
-    if (userId) {
-      const url = `https://10xer-web-production.up.railway.app/mcp-api/facebook_token_by_user?userId=${userId}`;
-      try {
-        const res = await fetch(url);
-
-        if (!res.ok) {
-          throw new Error(`Failed to fetch Facebook token: ${res.status}`);
-        }
-
-        const data = await res.json();
-        if (data.success && data.facebook_access_token) {
-          this.currentFacebookAccessToken = data.facebook_access_token;
-          console.error('✅ Facebook access token fetched:', this.currentFacebookAccessToken.slice(0, 10) + '...');
-          return;
-        } else {
-          throw new Error('Token not present in response');
-        }
-      } catch (err) {
-        console.error('❌ Error fetching Facebook token:', err.message);
-        // Fall back to environment token if available
-        if (process.env.FACEBOOK_ACCESS_TOKEN) {
-          this.currentFacebookAccessToken = process.env.FACEBOOK_ACCESS_TOKEN;
-          console.error('✅ Falling back to environment Facebook access token');
-          return;
-        }
-        throw err;
-      }
-    }
-
-    throw new Error('No Facebook access token available');
+  createMcpServer(getAccountKey) {
+    const server = new Server({
+      name: process.env.MCP_SERVER_NAME || 'facebook-ads-universal',
+      version: process.env.MCP_SERVER_VERSION || '2.0.0',
+    }, { capabilities: { tools: {} } });
+    const adapter = this.adapters.mcp;
+    server.setRequestHandler(ListToolsRequestSchema, async () => ({
+      tools: adapter.getToolDefinitions(TOOL_SCHEMAS),
+    }));
+    server.setRequestHandler(CallToolRequestSchema, async (request, extra) => {
+      const result = await this.executeToolCall(adapter.parseRequest(request), getAccountKey(extra));
+      return adapter.formatResponse(result);
+    });
+    return server;
   }
 
   setupApiServer() {
-    this.apiServer.get('/mcp', async (req, res) => {
-      try {
-        this.apiServer.get('/claude-manifest', (_req, res) => {
-          res.json(NEW_CLAUDE_CONNECTOR_MANIFEST);
-        });
-        this.activeSseTransport = new SSEServerTransport('/mcp', res);
-        await this.mcpServer.connect(this.activeSseTransport);
-      } catch (err) {
-        if (!res.headersSent) {
-          res.status(500).send('MCP connection failed');
-        }
-      }
-    });
-    // this.apiServer.get('/mcp', (req, res) => {
-    //   const sseTransport = new SSEServerTransport('/mcp', res);
-    //   this.mcpServer.connect(sseTransport).catch(err => {
-    //     console.error('SSE connection error:', err);
-    //     res.status(500).send('MCP connection failed');
-    //   });
-    // });
-
-    // this.apiServer.post('/mcp', (req, res) => {
-    //   const sseTransport = new SSEServerTransport('/mcp', res);
-    //   this.mcpServer.connect(sseTransport).catch(err => {
-    //     console.error('SSE connection error:', err);
-    //     res.status(500).send('MCP connection failed');
-    //   });
-    // });
-
-    this.apiServer.post('/mcp', async (req, res) => {
-      try {
-        if (!this.activeSseTransport) {
-          throw new Error('SSE connection not established');
-        }
-        await this.activeSseTransport.handlePostMessage(req, res);
-      } catch (err) {
-        console.error('SSE POST error:', err);
-        if (!res.headersSent) {
-          res.status(500).send('MCP POST failed');
-        }
-      }
-    });
     this.apiServer.use(cors());
     this.apiServer.use(express.json({ limit: '50mb' }));
-
-    // 🔍 CLAUDE.AI REQUEST LOGGER - Capture all requests for debugging
     this.apiServer.use((req, res, next) => {
-      const timestamp = new Date().toISOString();
-      const userAgent = req.get('User-Agent') || 'unknown';
-
-      console.log(`\n🔍 [${timestamp}] ${req.method} ${req.path}`);
-      console.log(`🔍 User-Agent: ${userAgent}`);
-      console.log(`🔍 Headers:`, JSON.stringify(req.headers, null, 2));
-
-      if (req.body && Object.keys(req.body).length > 0) {
-        console.log(`🔍 Body:`, JSON.stringify(req.body, null, 2));
-      }
-
-      // Log Claude.ai specific requests
-      if (userAgent.toLowerCase().includes('claude') ||
-        userAgent.toLowerCase().includes('anthropic') ||
-        req.path.includes('mcp') ||
-        req.path.includes('manifest') ||
-        req.path.includes('well-known')) {
-        console.log(`🚨 POTENTIAL CLAUDE.AI REQUEST DETECTED! 🚨`);
-      }
-
+      res.set('Cache-Control', 'no-store');
       next();
     });
 
@@ -236,7 +94,6 @@ class UniversalFacebookAdsServer {
 
     // SSE test endpoint to verify Railway SSE support
     this.apiServer.get('/sse-test', (req, res) => {
-      console.log('SSE test endpoint hit');
       res.writeHead(200, {
         'Content-Type': 'text/event-stream',
         'Cache-Control': 'no-cache',
@@ -261,7 +118,6 @@ class UniversalFacebookAdsServer {
       // Clean up on client disconnect
       req.on('close', () => {
         clearInterval(interval);
-        console.log('SSE test client disconnected');
       });
     });
 
@@ -270,12 +126,11 @@ class UniversalFacebookAdsServer {
       try {
         const adapter = this.adapters.openai;
         const normalized = adapter.parseRequest(req.body);
-        const result = await this.executeToolCall(normalized);
+        const result = await this.executeToolCall(normalized, parseAccountBearer(req.get('Authorization')));
         const response = adapter.formatResponse(result, normalized.toolCallId);
         res.json(response);
       } catch (error) {
-        console.error('OpenAI API error:', error);
-        res.status(500).json(this.adapters.openai.formatError(error));
+        res.status(error.status || 500).json(this.adapters.openai.formatError(error));
       }
     });
 
@@ -304,7 +159,6 @@ class UniversalFacebookAdsServer {
       const testManifests = this.getTestManifests();
 
       if (testManifests[variant]) {
-        console.log(`🧪 Serving test manifest variant: ${variant}`);
         res.json(testManifests[variant]);
       } else {
         res.status(404).json({
@@ -316,9 +170,6 @@ class UniversalFacebookAdsServer {
 
     // TESTING: Handle MCP requests to manifest URLs (Claude.ai does this)
     this.apiServer.post('/test-manifest/:variant', async (req, res) => {
-      const variant = req.params.variant;
-      console.log(`🔗 MCP request to test manifest: ${variant}`);
-
       try {
         // Handle MCP protocol on manifest endpoint
         const message = req.body;
@@ -343,8 +194,8 @@ class UniversalFacebookAdsServer {
         } else if (message.method === 'tools/call') {
           const result = await this.executeToolCall({
             toolName: message.params.name,
-            args: message.params.arguments || {}
-          });
+            args: message.params.arguments || {},
+          }, parseAccountBearer(req.get('Authorization')));
           res.json({
             jsonrpc: "2.0",
             id: message.id,
@@ -358,8 +209,7 @@ class UniversalFacebookAdsServer {
           });
         }
       } catch (error) {
-        console.error('MCP test manifest error:', error);
-        res.status(500).json({
+        res.status(error.status || 500).json({
           jsonrpc: "2.0",
           id: req.body.id || 0,
           error: { code: -32603, message: error.message }
@@ -384,12 +234,11 @@ class UniversalFacebookAdsServer {
       try {
         const adapter = this.adapters.gemini;
         const normalized = adapter.parseRequest(req.body);
-        const result = await this.executeToolCall(normalized);
+        const result = await this.executeToolCall(normalized, parseAccountBearer(req.get('Authorization')));
         const response = adapter.formatResponse(result);
         res.json(response);
       } catch (error) {
-        console.error('Gemini API error:', error);
-        res.status(500).json(this.adapters.gemini.formatError(error));
+        res.status(error.status || 500).json(this.adapters.gemini.formatError(error));
       }
     });
 
@@ -408,7 +257,44 @@ class UniversalFacebookAdsServer {
       res.json({ tools });
     });
 
-    // MCP Streamable HTTP endpoint for Claude connector (new standard)
+    // Each native SSE connection has its own MCP Server and owner-bound message endpoint.
+    for (const endpoint of ['/mcp', '/mcp/sse']) {
+      this.apiServer.get(endpoint, async (req, res) => {
+        let transport;
+        try {
+          const key = parseAccountBearer(req.get('Authorization'));
+          await getAccountFacebookToken(key);
+          if (res.destroyed) return;
+          transport = new SSEServerTransport(endpoint, res);
+          const owner = createHash('sha256').update(key).digest('hex');
+          this.sseSessions.set(transport.sessionId, { owner, endpoint, transport });
+          res.once('close', () => this.sseSessions.delete(transport.sessionId));
+          const server = this.createMcpServer(extra => extra.authInfo?.token);
+          await server.connect(transport);
+        } catch (error) {
+          if (transport) this.sseSessions.delete(transport.sessionId);
+          if (res.headersSent) return res.end();
+          res.status(error.status || 500).json({ error: error.status ? error.message : 'MCP connection failed' });
+        }
+      });
+
+      this.apiServer.post(endpoint, async (req, res, next) => {
+        if (!Object.hasOwn(req.query, 'sessionId') && endpoint === '/mcp') return next();
+        try {
+          const key = parseAccountBearer(req.get('Authorization'));
+          const session = this.sseSessions.get(req.query.sessionId);
+          const owner = createHash('sha256').update(key).digest('hex');
+          if (!session || session.owner !== owner || session.endpoint !== endpoint) {
+            return res.status(404).json({ error: 'Unknown MCP session' });
+          }
+          req.auth = { token: key };
+          await session.transport.handlePostMessage(req, res, req.body);
+        } catch (error) {
+          if (!res.headersSent) res.status(error.status || 500).json({ error: error.status ? error.message : 'MCP message failed' });
+        }
+      });
+    }
+
     this.apiServer.post('/mcp', async (req, res) => {
       try {
         // Handle MCP requests directly via HTTP (no SSE needed)
@@ -431,7 +317,6 @@ class UniversalFacebookAdsServer {
           });
         } else if (request.method === 'notifications/initialized') {
           // Claude.ai sends this after initialization - acknowledge it
-          console.log('✅ Claude.ai initialization notification received');
           res.status(200).end();
         } else if (request.method === 'tools/list') {
           const tools = this.adapters.mcp.getToolDefinitions(TOOL_SCHEMAS);
@@ -443,8 +328,8 @@ class UniversalFacebookAdsServer {
         } else if (request.method === 'tools/call') {
           const result = await this.executeToolCall({
             toolName: request.params.name,
-            args: request.params.arguments || {}
-          });
+            args: request.params.arguments || {},
+          }, parseAccountBearer(req.get('Authorization')));
           res.json({
             jsonrpc: "2.0",
             id: request.id,
@@ -458,8 +343,7 @@ class UniversalFacebookAdsServer {
           });
         }
       } catch (err) {
-        console.error('MCP error:', err);
-        res.status(500).json({
+        res.status(err.status || 500).json({
           jsonrpc: "2.0",
           id: req.body?.id,
           error: { code: -32603, message: err.message }
@@ -468,244 +352,16 @@ class UniversalFacebookAdsServer {
     });
 
     // MCP GET endpoint for SSE connection (Claude.ai expects this)
-    this.apiServer.get('/mcp', async (req, res) => {
+    this.apiServer.post('/tools/:name', async (req, res) => {
       try {
-        const transport = new SSEServerTransport('/mcp', res);
-        await transport.start();
-
-        transport.onmessage = async (message) => {
-          try {
-            if (message.method === 'initialize') {
-              await transport.send({
-                jsonrpc: "2.0",
-                id: message.id,
-                result: {
-                  protocolVersion: "2025-06-18",
-                  capabilities: { tools: {} },
-                  serverInfo: { name: "facebook-ads-universal", version: "2.0.0" }
-                }
-              });
-            } else if (message.method === 'tools/list') {
-              const tools = this.adapters.mcp.getToolDefinitions(TOOL_SCHEMAS);
-              await transport.send({
-                jsonrpc: "2.0",
-                id: message.id,
-                result: { tools }
-              });
-            } else if (message.method === 'tools/call') {
-              const result = await this.executeToolCall({
-                toolName: message.params.name,
-                args: message.params.arguments || {}
-              });
-              await transport.send({
-                jsonrpc: "2.0",
-                id: message.id,
-                result: { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] }
-              });
-            } else if (message.method === 'notifications/initialized') {
-              // Claude.ai sends this after initialization - acknowledge it
-              console.log('✅ Claude.ai initialization notification received');
-            }
-          } catch (err) {
-            await transport.send({
-              jsonrpc: "2.0",
-              id: message.id,
-              error: { code: -32603, message: err.message }
-            });
-          }
-        };
-      } catch (err) {
-        console.error('SSE setup error:', err);
-        res.status(500).end();
-      }
-    });
-
-    // MCP SSE endpoint for Claude.ai connectors  
-    this.apiServer.get('/mcp/sse', async (req, res) => {
-      try {
-        const transport = new SSEServerTransport('/mcp/sse', res);
-        await transport.start();
-
-        transport.onmessage = async (message) => {
-          try {
-            if (message.method === 'initialize') {
-              await transport.send({
-                jsonrpc: "2.0",
-                id: message.id,
-                result: {
-                  protocolVersion: "2025-06-18",
-                  capabilities: { tools: {} },
-                  serverInfo: { name: "facebook-ads-universal", version: "2.0.0" }
-                }
-              });
-            } else if (message.method === 'tools/list') {
-              const tools = this.adapters.mcp.getToolDefinitions(TOOL_SCHEMAS);
-              await transport.send({
-                jsonrpc: "2.0",
-                id: message.id,
-                result: { tools }
-              });
-            } else if (message.method === 'tools/call') {
-              const result = await this.executeToolCall({
-                toolName: message.params.name,
-                args: message.params.arguments || {}
-              });
-              await transport.send({
-                jsonrpc: "2.0",
-                id: message.id,
-                result: { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] }
-              });
-            }
-          } catch (err) {
-            await transport.send({
-              jsonrpc: "2.0",
-              id: message.id,
-              error: { code: -32603, message: err.message }
-            });
-          }
-        };
-      } catch (err) {
-        console.error('SSE setup error:', err);
-        res.status(500).end();
-      }
-    });
-
-    // REST API endpoints for individual tools (Claude.ai connector compatibility)
-    this.apiServer.post('/tools/facebook_login', async (req, res) => {
-      try {
-        const result = await this.executeToolCall({
-          toolName: 'facebook_login',
-          args: req.body
-        });
+        const key = parseAccountBearer(req.get('Authorization'));
+        const result = await this.executeToolCall({ toolName: req.params.name, args: req.body }, key);
         res.json(result);
       } catch (error) {
-        res.status(500).json({ error: error.message });
+        res.status(error.status || 500).json({ error: error.message });
       }
     });
 
-    this.apiServer.post('/tools/facebook_logout', async (req, res) => {
-      try {
-        const result = await this.executeToolCall({
-          toolName: 'facebook_logout',
-          args: req.body
-        });
-        res.json(result);
-      } catch (error) {
-        res.status(500).json({ error: error.message });
-      }
-    });
-
-    this.apiServer.post('/tools/facebook_check_auth', async (req, res) => {
-      try {
-        const result = await this.executeToolCall({
-          toolName: 'facebook_check_auth',
-          args: req.body
-        });
-        res.json(result);
-      } catch (error) {
-        res.status(500).json({ error: error.message });
-      }
-    });
-
-    this.apiServer.post('/tools/facebook_list_ad_accounts', async (req, res) => {
-      try {
-        const result = await this.executeToolCall({
-          toolName: 'facebook_list_ad_accounts',
-          args: req.body
-        });
-        res.json(result);
-      } catch (error) {
-        res.status(500).json({ error: error.message });
-      }
-    });
-
-    this.apiServer.post('/tools/facebook_fetch_pagination_url', async (req, res) => {
-      try {
-        const result = await this.executeToolCall({
-          toolName: 'facebook_fetch_pagination_url',
-          args: req.body
-        });
-        res.json(result);
-      } catch (error) {
-        res.status(500).json({ error: error.message });
-      }
-    });
-
-    this.apiServer.post('/tools/facebook_get_details_of_ad_account', async (req, res) => {
-      try {
-        const result = await this.executeToolCall({
-          toolName: 'facebook_get_details_of_ad_account',
-          args: req.body
-        });
-        res.json(result);
-      } catch (error) {
-        res.status(500).json({ error: error.message });
-      }
-    });
-
-    this.apiServer.post('/tools/facebook_get_adaccount_insights', async (req, res) => {
-      try {
-        const result = await this.executeToolCall({
-          toolName: 'facebook_get_adaccount_insights',
-          args: req.body
-        });
-        res.json(result);
-      } catch (error) {
-        res.status(500).json({ error: error.message });
-      }
-    });
-
-    this.apiServer.post('/tools/facebook_get_activities_by_adaccount', async (req, res) => {
-      try {
-        const result = await this.executeToolCall({
-          toolName: 'facebook_get_activities_by_adaccount',
-          args: req.body
-        });
-        res.json(result);
-      } catch (error) {
-        res.status(500).json({ error: error.message });
-      }
-    });
-
-    this.apiServer.post('/tools/facebook_get_ad_creatives', async (req, res) => {
-      try {
-        const result = await this.executeToolCall({
-          toolName: 'facebook_get_ad_creatives',
-          args: req.body
-        });
-        res.json(result);
-      } catch (error) {
-        res.status(500).json({ error: error.message });
-      }
-    });
-
-    // MCP SSE endpoints for Claude connector
-    this.apiServer.get('/mcp', async (req, res) => {
-      try {
-        const sseTransport = new SSEServerTransport('/mcp', res);
-        await this.mcpServer.connect(sseTransport);
-      } catch (err) {
-        console.error('SSE connection error:', err);
-        if (!res.headersSent) {
-          res.status(500).send('MCP connection failed');
-        }
-      }
-    });
-
-    this.apiServer.post('/mcp', async (req, res) => {
-      try {
-        const sseTransport = new SSEServerTransport('/mcp', res);
-        await sseTransport.handlePostMessage(req, res);
-      } catch (err) {
-        console.error('SSE POST error:', err);
-        if (!res.headersSent) {
-          res.status(500).send('MCP POST failed');
-        }
-      }
-    });
-
-
-    // Claude OAuth endpoints
     this.apiServer.get('/mcp/start-auth/', (req, res) => {
       // For now, indicate that authentication is handled via tools
       res.json({
@@ -808,308 +464,18 @@ class UniversalFacebookAdsServer {
             <p>
               Step 2: <a href="https://10xer-web-production.up.railway.app/integrations/integrations" target="_blank" rel="noopener noreferrer">Visit the Integrations Page</a>
             </p>
-            <p>Once logged in, click the button below to continue:</p>
-            <form method="GET" action="/trigger-token-fetch">
-              <button type="submit">✅ I'm Logged In – Continue</button>
-            </form>
+            <p>Connect Facebook in Integrations. Configure your MCP client with your 10xer dashboard API key.</p>
           </main>
         </body>
         </html>
       `);
     });
 
-    // this.apiServer.get('/trigger-token-fetch', async (req, res) => {
-    //   try {
-    //     // Extract the session cookie from the incoming request headers
-    //     const sessionCookie = req.headers.cookie
-    //       ?.split(';')
-    //       .map(c => c.trim())
-    //       .find(c => c.startsWith('session='));
-
-    //     if (!sessionCookie) {
-    //       return res.status(401).send('<h2>❌ No session cookie found. Please log in first.</h2>');
-    //     }
-
-    //     console.log("sessionCookie->", sessionCookie);
-
-    //     // Call the Facebook token API with the session cookie in the headers, using GET method
-    //     const response = await fetch('https://10xer-web-production.up.railway.app/integrations/api/facebook/token', {
-    //       method: 'GET',
-    //       headers: {
-    //         'Cookie': sessionCookie,  // Pass the session cookie here
-    //       }
-    //     });
-
-    //     if (!response.ok) {
-    //       throw new Error(`Token API responded with status ${response.status}`);
-    //     }
-
-    //     const data = await response.json();
-
-    //     if (data && data.access_token) {
-    //       this.facebookAccessToken = data.access_token;
-    //       res.send('<h2>✅ Token fetched! You may now return to the app.</h2>');
-    //     } else {
-    //       res.status(500).send('<h2>❌ Token fetch failed. No access token returned.</h2>');
-    //     }
-    //   } catch (error) {
-    //     console.error('Token fetch failed:', error);
-    //     res.status(500).send(`<h2>❌ Error: ${error.message}</h2>`);
-    //   }
-    // });
-
-    // POST: Save token for a specific user
-    // this.apiServer.post('/trigger-token-fetch', async (req, res) => {
-    //   try {
-    //     const { access_token, user_id } = req.body;
-
-    //     if (!access_token || !user_id) {
-    //       return res.status(400).send('<h2>❌ Missing access_token or user_id.</h2>');
-    //     }
-
-    //     console.log('✅ Received access token and user ID:', access_token, user_id);
-
-    //     // Validate token by requesting MCP
-    //     const response = await fetch('https://10xer-web-production.up.railway.app/integrations/api/facebook/token', {
-    //       method: 'GET',
-    //       headers: {
-    //         'Authorization': access_token,
-    //       }
-    //     });
-
-    //     if (!response.ok) {
-    //       throw new Error(`Token API responded with status ${response.status}`);
-    //     }
-
-    //     const data = await response.json();
-
-    //     if (data && data.access_token) {
-    //       // ✅ Save token per user_id
-    //       this.facebookAccessTokens[user_id] = data.access_token;
-    //       this.user_id = data.user_id
-
-    //       res.send('<h2>✅ Token fetched and saved! You may now return to the app.</h2>');
-    //     } else {
-    //       res.status(500).send('<h2>❌ Token fetch failed. No access token returned.</h2>');
-    //     }
-    //   } catch (error) {
-    //     console.error('❌ Error forwarding token:', error);
-    //     return res.status(500).send(`<h2>❌ Error: ${error.message}</h2>`);
-    //   }
-    // });
-
-    this.apiServer.post('/trigger-token-fetch', async (req, res) => {
-      try {
-        const { access_token, user_id, organization_id } = req.body;
-
-        if (!access_token || !user_id) {
-          return res.status(400).send('<h2>❌ Missing access_token or user_id.</h2>');
-        }
-
-        // Launch Puppeteer and get Claude cookie dynamically
-        // Only returns lastActiveOrg
-        // const lastActiveOrg = await getClaudeSessionCookie();
-
-        console.log("organization_id ->", organization_id);
-
-        // Get session ID from headers or cookies
-        const sessionId = req.headers['session-id'] || req.cookies?.session_id;
-        if (!sessionId) {
-          return res.status(400).send('<h2>❌ Session ID not found.</h2>');
-        }
-
-        // Optional: Save to in-memory map
-        this.sessionUserMap.set(this.activeSseTransport?.sessionId, sessionId);
-        console.log(`Session ${sessionId} associated with user ${user_id}`);
-        console.log("this.sessionUserMap ->", this.sessionUserMap);
-
-        // 🧠 Get local IPv4 (assumes your function exists)
-        let localIP;
-        try {
-          localIP = await getLocalIPv4();
-          console.log("🌐 Local IPv4 Address ->", localIP);
-        } catch (ipErr) {
-          console.error("Failed to get local IP:", ipErr);
-          localIP = null;
-        }
-
-        // Send POST to Flask backend with extra info
-        const response = await fetch('https://10xer-web-production.up.railway.app/mcp-api/save_user_session', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            user_id,
-            session_id: sessionId,
-            server_ip: localIP,
-            organization_id: organization_id,
-          }),
-        });
-
-        const result = await response.json();
-        console.log("result->", result);
-
-        if (result.success) {
-          res.send('<h2>✅ Token fetched, user info retrieved, and session saved! You may now return to the app.</h2>');
-        } else {
-          res.status(500).send(`<h2>⚠️ Flask error: ${result.message || 'Unknown error'}</h2>`);
-        }
-      } catch (error) {
-        console.error('❌ Error during token fetch or session save:', error);
-        res.status(500).send(`<h2>❌ Error: ${error.message}</h2>`);
-      }
+    // Browser enrollment now stays in the signed-in web app.
+    this.apiServer.all(['/trigger-token-fetch', '/save-trigger-token-fetch', '/getSession'], (_req, res) => {
+      res.status(410).json({ message: 'Manage the Facebook connection through your 10xer Integrations page.' });
     });
 
-    this.apiServer.get('/save-trigger-token-fetch', (req, res) => {
-      try {
-        const sessionId = req.query.session_id;
-
-        if (sessionId) {
-          const userId = this.sessionUserMap.get(sessionId);
-
-          if (userId) {
-            res.json({
-              success: true,
-              sessionId,
-              userId
-            });
-          } else {
-            res.status(404).json({
-              success: false,
-              message: 'No user found for given session_id'
-            });
-          }
-        } else {
-          // Return all mappings as array of objects
-          const sessionUserMapArray = Array.from(this.sessionUserMap, ([sessionId, userId]) => ({
-            sessionId,
-            userId,
-          }));
-
-          res.json({
-            success: true,
-            sessionUserMap: sessionUserMapArray
-          });
-        }
-      } catch (error) {
-        console.error('Error retrieving saved session-user mappings:', error);
-        res.status(500).json({
-          success: false,
-          message: 'Internal server error'
-        });
-      }
-    });
-
-    this.apiServer.get("/getSession", async(req, res) => {
-      res.json({cookie: req.headers.cookie})
-    })
-
-    // this.apiServer.get('/save-trigger-token-fetch', (req, res) => {
-    //   try {
-    //     const user_id = req.query.user_id;
-
-    //     if (user_id) {
-    //       const token = this.facebookAccessTokens[user_id];
-
-    //       if (token) {
-    //         res.json({
-    //           success: true,
-    //           user_id,
-    //           access_token: token
-    //         });
-    //       } else {
-    //         res.status(404).json({
-    //           success: false,
-    //           message: 'No token found for given user_id'
-    //         });
-    //       }
-    //     } else {
-    //       // No user_id provided — return all tokens
-    //       res.json({
-    //         success: true,
-    //         tokens: this.facebookAccessTokens
-    //       });
-    //     }
-    //   } catch (error) {
-    //     console.error('Error retrieving saved token(s):', error);
-    //     res.status(500).json({
-    //       success: false,
-    //       message: 'Internal server error'
-    //     });
-    //   }
-    // });
-
-    // Claude.ai individual tool endpoints (REST API format)
-    this.apiServer.post('/tools/facebook_list_ad_accounts', async (req, res) => {
-      try {
-        const result = await this.executeToolCall({ toolName: 'facebook_list_ad_accounts', args: req.body });
-        res.json({ content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] });
-      } catch (error) {
-        res.status(500).json({ error: error.message });
-      }
-    });
-
-    this.apiServer.post('/tools/facebook_get_details_of_ad_account', async (req, res) => {
-      try {
-        const result = await this.executeToolCall({ toolName: 'facebook_get_details_of_ad_account', args: req.body });
-        res.json({ content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] });
-      } catch (error) {
-        res.status(500).json({ error: error.message });
-      }
-    });
-
-    this.apiServer.post('/tools/facebook_get_adaccount_insights', async (req, res) => {
-      try {
-        const result = await this.executeToolCall({ toolName: 'facebook_get_adaccount_insights', args: req.body });
-        res.json({ content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] });
-      } catch (error) {
-        res.status(500).json({ error: error.message });
-      }
-    });
-
-    this.apiServer.post('/tools/facebook_get_ad_creatives', async (req, res) => {
-      try {
-        const result = await this.executeToolCall({ toolName: 'facebook_get_ad_creatives', args: req.body });
-        res.json({ content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] });
-      } catch (error) {
-        res.status(500).json({ error: error.message });
-      }
-    });
-
-    this.apiServer.post('/tools/facebook_get_activities_by_adaccount', async (req, res) => {
-      try {
-        const result = await this.executeToolCall({ toolName: 'facebook_get_activities_by_adaccount', args: req.body });
-        res.json({ content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] });
-      } catch (error) {
-        res.status(500).json({ error: error.message });
-      }
-    });
-
-    this.apiServer.post('/tools/facebook_get_campaign_details', async (req, res) => {
-      try {
-        const result = await this.executeToolCall({ toolName: 'facebook_get_campaign_details', args: req.body });
-        res.json({ content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] });
-      } catch (error) {
-        res.status(500).json({ error: error.message });
-      }
-    });
-
-    this.apiServer.post('/tools/facebook_get_adset_details', async (req, res) => {
-      try {
-        const result = await this.executeToolCall({ toolName: 'facebook_get_adset_details', args: req.body });
-        res.json({ content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] });
-      } catch (error) {
-        res.status(500).json({ error: error.message });
-      }
-    });
-
-    this.apiServer.post('/tools/facebook_get_creative_asset_url_by_ad_id', async (req, res) => {
-      try {
-        const result = await this.executeToolCall({ toolName: 'facebook_get_creative_asset_url_by_ad_id', args: req.body });
-        res.json({ content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] });
-      } catch (error) {
-        res.status(500).json({ error: error.message });
-      }
-    });
   }
 
   getTestManifests() {
@@ -1202,275 +568,26 @@ class UniversalFacebookAdsServer {
     };
   }
 
-  setupMCPHandlers() {
-    // Existing MCP handlers (unchanged)
-    this.mcpServer.setRequestHandler(ListToolsRequestSchema, async () => {
-      return {
-        tools: this.adapters.mcp.getToolDefinitions(TOOL_SCHEMAS)
-      };
-    });
-
-    this.mcpServer.setRequestHandler(CallToolRequestSchema, async (request) => {
-      try {
-        const adapter = this.adapters.mcp;
-        const normalized = adapter.parseRequest(request);
-        const result = await this.executeToolCall(normalized);
-        return adapter.formatResponse(result);
-      } catch (error) {
-        console.error(`MCP Error in tool ${request.params.name}:`, error);
-        throw error;
-      }
-    });
-  }
-
-  /**
-   * Execute tool call - REUSES ALL EXISTING LOGIC!
-   * This is the core function that all protocols use
-   */
-  // async executeToolCall({ toolName, args }) {
-  //   switch (toolName) {
-  //     case 'facebook_login':
-  //       return await facebookLogin(args);
-
-  //     case 'facebook_logout':
-  //       return await facebookLogout(args);
-
-  //     case 'facebook_check_auth':
-  //       return await facebookCheckAuth(args);
-
-  //     case 'facebook_list_ad_accounts':
-  //       return await listAdAccounts(args, this.facebookAccessToken);
-
-  //     case 'facebook_fetch_pagination_url':
-  //       return await fetchPaginationUrl(args, this.facebookAccessToken);
-
-  //     case 'facebook_get_details_of_ad_account':
-  //       return await getAccountDetails(args, this.facebookAccessToken);
-
-  //     case 'facebook_get_adaccount_insights':
-  //       return await getAccountInsights(args, this.facebookAccessToken);
-
-  //     case 'facebook_get_activities_by_adaccount':
-  //       return await getAccountActivities(args, this.facebookAccessToken);
-
-  //     case 'facebook_get_ad_creatives':
-  //       return await getAdCreatives(args, this.facebookAccessToken);
-
-  //     case 'facebook_get_ad_thumbnails':
-  //       // return await getAdThumbnailsEmbedded(args);
-  //       throw new Error('get_ad_thumbnails_embedded tool is temporarily disabled');
-
-  //     case '_list_tools':
-  //       return {
-  //         content: [{
-  //           type: 'text',
-  //           text: JSON.stringify(Object.keys(TOOL_SCHEMAS), null, 2)
-  //         }]
-  //       };
-
-  //     default:
-  //       throw new Error(`Unknown tool: ${toolName}`);
-  //   }
-  // }
-
-  // async waitForOrganizationId() {
-  //   await open('https://10xer-web-production.up.railway.app/integrations/enter_organization');
-  //   console.log("🔍 Waiting for user to submit organization ID...");
-
-  //   let organizationId = null;
-  //   const maxAttempts = 10;
-  //   const interval = 3000;
-
-  //   for (let i = 0; i < maxAttempts; i++) {
-  //     try {
-  //       const res = await fetch('https://10xer-web-production.up.railway.app/integrations/enter_organization', {
-  //         method: 'GET',
-  //         credentials: 'include',
-  //       });
-
-  //       if (res.ok) {
-  //         const data = await res.json();
-  //         if (data.organization_id) {
-  //           organizationId = data.organization_id;
-  //           console.log("✅ Received organization ID:", organizationId);
-  //           break;
-  //         }
-  //       }
-  //     } catch (err) {
-  //       console.warn(`Attempt ${i + 1}: Could not fetch organization ID`);
-  //     }
-
-  //     await new Promise(resolve => setTimeout(resolve, interval));
-  //   }
-
-  //   if (!organizationId) {
-  //     throw new Error("❌ Timeout waiting for organization ID input.");
-  //   }
-
-  //   return organizationId;
-  // }
-
-  // ========== Prompt user for org ID ==========
-  async askOrganizationId() {
-    await sendMessageToUser({
-      type: 'text',
-      text: '🔐 Please enter your **Organization ID** to continue:'
-    });
-
-    const response = await this.waitForUserResponse();
-    const orgId = response?.text?.trim();
-
-    if (!orgId) {
-      throw new Error("❌ No organization ID provided by the user.");
-    }
-
-    console.log(`📥 User provided organization ID: ${orgId}`);
-    return orgId;
-  }
-
-  // ========== Send message to user ==========
-  async sendMessageToUser(message) {
-    if (!this.activeSseTransport || !this.activeSseTransport.sessionId) {
-      throw new Error("No active session to send message to.");
-    }
-    const sessionId = this.activeSseTransport.sessionId;
-
-    // Example: emit/send message to user session — adapt to your system
-    this.messageBus.emit('send_message', {
-      sessionId,
-      content: message,
-      timestamp: Date.now(),
-    });
-
-    console.log(`Sent message to user (session: ${sessionId}):`, message.text);
-  }
-
-  // ========== Wait for user input ==========
-  async waitForUserResponse(timeoutMs = 60000) {
-    return new Promise((resolve, reject) => {
-      if (!this.activeSseTransport || !this.activeSseTransport.sessionId) {
-        return reject(new Error("No active session for user response."));
-      }
-      const sessionId = this.activeSseTransport.sessionId;
-
-      // Handler for user messages
-      const onUserMessage = (msg) => {
-        if (msg.sessionId === sessionId) {
-          this.messageBus.off('user_message', onUserMessage);
-          resolve(msg.content);
-        }
-      };
-
-      // Listen for user message events (adapt to your event emitter)
-      this.messageBus.on('user_message', onUserMessage);
-
-      // Timeout if no response
-      setTimeout(() => {
-        this.messageBus.off('user_message', onUserMessage);
-        reject(new Error("User response timed out."));
-      }, timeoutMs);
-    });
-  }
-
-  // ========== Resolve user ID using session map or fallback with org ID ==========
-  async resolveUserIdFromSessionOrOrg(sessionUserMap, sessionId, organizationId) {
-    let user_id = sessionUserMap.get(sessionId);
-    if (user_id) {
-      console.log("✅ Found user_id from session:", user_id);
-      return user_id;
-    }
-
-    console.warn('⚠️ No user_id found in session. Using organization_id fallback...');
-
-    if (!organizationId) {
-      throw new Error("Organization ID is required for fallback resolution.");
-    }
-
-    // Use organizationId in fallback URL
-    const fallbackUrl = `https://10xer-web-production.up.railway.app/mcp-api/get_latest_session_by_org_id?organization_id=${organizationId}`;
-    console.log(`🌐 Fetching fallback session from: ${fallbackUrl}`);
-
-    const fallbackRes = await fetch(fallbackUrl);
-    if (!fallbackRes.ok) {
-      throw new Error(`❌ HTTP error from fallback API: ${fallbackRes.status} ${fallbackRes.statusText}`);
-    }
-
-    const fallbackData = await fallbackRes.json();
-    if (!fallbackData.success || !fallbackData.user_id) {
-      throw new Error('❌ No valid session found for organization ID.');
-    }
-
-    console.log(`✅ Fallback resolved session_id: ${fallbackData.session_id}`);
-    return fallbackData.session_id;
-  }
-
-  async executeToolCall({ toolName, args }) {
-    console.error("args->", args)
-    // console.error("args?.user_id->", args?.user_id)
-    
-    // Only fetch Facebook token for tools that need it (not auth tools)
-    // const authTools = ['facebook_login', 'facebook_logout', 'facebook_check_auth'];
-    // if (!authTools.includes(toolName)) {
-    //   await this.fetchFacebookAccessToken(this.user_id)
-    //   console.error("this.currentFacebookAccessToken->", this.currentFacebookAccessToken);
-    // }
-
-    let user_id;
-    // Tools that don't require org/user ID or Facebook token
-    // const authExemptTools = ['facebook_login', 'facebook_logout', 'facebook_check_auth'];
-
-    // if (!authExemptTools.includes(toolName)) {
-    let organizationId = args.organization_id;
-
-    if (!organizationId) {
-      // Prompt user via chat to enter org ID
-      organizationId = await this.askOrganizationId();
-      if (!organizationId) {
-        throw new Error("❌ Organization ID is required but was not provided.");
-      }
-    }
-
-    // Resolve user ID with organization ID provided
-    const userId = await this.resolveUserIdFromSessionOrOrg(
-      this.sessionUserMap,
-      this.activeSseTransport?.sessionId,
-      organizationId
-    );
-
-    // Fetch Facebook token for resolved user
-    await this.fetchLatestFacebookAccessToken(userId);
-    console.log("this.currentFacebookAccessToken->", this.currentFacebookAccessToken);
-    // }
-
-    
-    // Step 2: tool switch
+  async executeToolCall({ toolName, args }, accountKey) {
+    const token = await getAccountFacebookToken(accountKey);
     switch (toolName) {
-      // case 'facebook_login':
-      //   return await facebookLogin(args);
-
-      // case 'facebook_logout':
-      //   return await facebookLogout(args);
-
-      // case 'facebook_check_auth':
-      //   return await facebookCheckAuth(args);
-      
       case 'facebook_list_ad_accounts':
-        return await listAdAccounts(args, this.currentFacebookAccessToken);
+        return await listAdAccounts(args, token);
 
       case 'facebook_fetch_pagination_url':
-        return await fetchPaginationUrl(args, this.currentFacebookAccessToken);
+        return await fetchPaginationUrl(args, token);
 
       case 'facebook_get_details_of_ad_account':
-        return await getAccountDetails(args, this.currentFacebookAccessToken);
+        return await getAccountDetails(args, token);
 
       case 'facebook_get_adaccount_insights':
-        return await getAccountInsights(args, this.currentFacebookAccessToken);
+        return await getAccountInsights(args, token);
 
       case 'facebook_get_activities_by_adaccount':
-        return await getAccountActivities(args, this.currentFacebookAccessToken);
+        return await getAccountActivities(args, token);
 
       case 'facebook_get_ad_creatives':
-        return await getAdCreatives(args, this.currentFacebookAccessToken);
+        return await getAdCreatives(args, token);
 
       case 'facebook_get_ad_thumbnails':
         throw new Error('get_ad_thumbnails_embedded tool is temporarily disabled');
@@ -1488,62 +605,14 @@ class UniversalFacebookAdsServer {
     }
   }
 
-  // async fetchFacebookAccessToken() {
-  //   const integrationsUrl = 'https://10xer-web-production.up.railway.app/integrations/integrations';
-  //   const loginUrl = 'https://10xer-web-production.up.railway.app/login';
-  //   const tokenUrl = 'https://10xer-web-production.up.railway.app/api/facebook/token';
-
-  //   try {
-  //     // 1) Open the integrations URL in the default browser
-  //     await open(integrationsUrl);
-
-  //     // 2) Open the login URL in the default browser
-  //     await open(loginUrl);
-
-  //     // 3) Fetch the Facebook token now
-  //     const tokenRes = await fetch(tokenUrl);
-  //     if (!tokenRes.ok) {
-  //       throw new Error(`Facebook token fetch failed: ${tokenRes.status}`);
-  //     }
-
-  //     const data = await tokenRes.json();
-
-  //     if (data && data.success === true && typeof data.facebook_access_token === 'string') {
-  //       this.facebookAccessToken = data.facebook_access_token;
-  //       console.log('✅ Facebook access token fetched:', this.facebookAccessToken.slice(0, 10) + '...');
-  //     } else {
-  //       throw new Error('Facebook token not found or invalid in response');
-  //     }
-  //   } catch (err) {
-  //     throw err;
-  //   }
-  // }
-
-  // async fetchFacebookAccessToken() {
-  //   const helperUrl = 'https://10xer-production.up.railway.app/facebook-auth-helper';
-
-  //   console.log('🧭 Opening Facebook auth helper page...');
-  //   await open(helperUrl);
-
-  //   // Instead of fetching the token immediately here, the user will do it via UI
-  //   throw new Error('🔐 Facebook login required. Please complete login in the browser.');
-  // }
-
-
-  // async startMCP() {
-  //   const transport = new StdioServerTransport();
-  //   await this.mcpServer.connect(transport);
-  //   console.error('Facebook Ads MCP server running on stdio');
-  // }
-
   async startMCP() {
     try {
-      console.log('🔄 Connecting MCP server via stdio...');
+      console.error('Connecting MCP server via stdio');
 
       const transport = new StdioServerTransport();
-      await this.mcpServer.connect(transport);
+      await this.createMcpServer(() => process.env.API_KEY).connect(transport);
 
-      console.log('✅ MCP server connected on stdio');
+      console.error('MCP server connected on stdio');
 
     } catch (err) {
       console.error('❌ Failed during MCP startup:', err.message);
@@ -1577,19 +646,10 @@ class UniversalFacebookAdsServer {
 }
 
 // Handle process errors
-process.on('uncaughtException', (error) => {
-  console.error('Uncaught exception:', error);
-  process.exit(1);
-});
-
-process.on('unhandledRejection', (reason, promise) => {
-  console.error('Unhandled rejection at:', promise, 'reason:', reason);
-  process.exit(1);
-});
-
-// Start the server
-const server = new UniversalFacebookAdsServer();
-server.start().catch((error) => {
-  console.error('Failed to start server:', error);
-  process.exit(1);
-});
+if (process.argv[1] && realpathSync(process.argv[1]) === __filename) {
+  const server = new UniversalFacebookAdsServer();
+  server.start().catch(() => {
+    console.error('Failed to start universal server');
+    process.exitCode = 1;
+  });
+}

@@ -1,7 +1,6 @@
 #!/usr/bin/env node
 
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
-import { SSEServerTransport } from '@modelcontextprotocol/sdk/server/sse.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js';
 import dotenv from 'dotenv';
@@ -23,71 +22,19 @@ import { getAccountDetails } from './tools/get-account-details.js';
 import { getAccountInsights } from './tools/get-account-insights.js';
 import { getAccountActivities } from './tools/get-account-activities.js';
 import { getAdCreatives } from './tools/get-ad-creatives.js';
-import { TokenStorage } from './auth/token-storage.js';
+import { getDesktopFacebookToken } from './auth/account-key.js';
 
 import { TOOL_SCHEMAS } from './schemas/local-tool-schemas.js';
-import { CLAUDE_CONNECTOR_MANIFEST } from './claude-connector-manifest.js';
 
 dotenv.config({ path: new URL('../.env', import.meta.url) });
 
 class FacebookAdsMCPServer {
-  constructor({ serverName, sseUrl, apiKey }) {
-  this.serverName = serverName;
-  this.sseUrl = sseUrl;
-  this.apiKey = apiKey;
-
-  // Remove trailing /sse if exists
-  this.apiBaseUrl = this.sseUrl.replace(/\/sse$/, '');
-
-  // console.log("serverName->", serverName);
-  // console.log("sseUrl->", sseUrl);
-  // console.log("apiKey->", apiKey);
-
-  this.facebookAccessToken = null; // placeholder
-
-  this.server = new Server({
-    name: this.serverName || process.env.MCP_SERVER_NAME || 'facebook-ads-mcp',
-    version: process.env.MCP_SERVER_VERSION || '1.0.0',
-  }, {
-    capabilities: { tools: {} },
-  });
-
-  this.setupToolHandlers();
-  this.fetchFacebookAccessToken();
-}
-
-  // Example helper to do fetch with auth headers from instance props
-  async fetchWithAuth(url, options = {}) {
-    const headers = options.headers || {};
-    headers['Authorization'] = `Bearer ${this.apiKey}`;
-    headers['X-Server-Name'] = this.serverName;
-    return fetch(url, { ...options, headers });
-  }
-
-  async fetchFacebookAccessToken() {
-    const url = `${this.apiBaseUrl}/facebook_token`;
-    try {
-      const res = await fetch(url, {
-        headers: {
-          Authorization: `Bearer ${this.apiKey}`
-        }
-      });
-
-      if (!res.ok) {
-        throw new Error(`Failed to fetch Facebook token: ${res.status}`);
-      }
-
-      const data = await res.json();
-      if (data.success && data.facebook_access_token) {
-        this.facebookAccessToken = data.facebook_access_token;
-        console.error('✅ Facebook access token fetched:', this.facebookAccessToken.slice(0, 10) + '...');
-      } else {
-        throw new Error('Token not present in response');
-      }
-    } catch (err) {
-      console.error('❌ Error fetching Facebook token:', err.message);
-      throw err;
-    }
+  constructor() {
+    this.server = new Server({
+      name: process.env.SERVER_NAME || process.env.MCP_SERVER_NAME || 'facebook-ads-mcp',
+      version: process.env.MCP_SERVER_VERSION || '2.1.4',
+    }, { capabilities: { tools: {} } });
+    this.setupToolHandlers();
   }
 
   setupToolHandlers() {
@@ -107,17 +54,20 @@ class FacebookAdsMCPServer {
 
     this.server.setRequestHandler(CallToolRequestSchema, async (request) => {
       const { name, arguments: args } = request.params;
-      // Example: If you want to use this.fetchWithAuth inside your tools, you could pass it or rewrite tools to accept it.
+      const accessToken = process.env.API_KEY
+        ? await getDesktopFacebookToken(process.env.API_KEY, process.env.SSE_URL)
+        : process.env.FACEBOOK_ACCESS_TOKEN;
+      if (!accessToken) throw new Error('Configure your 10xer API key in the extension settings.');
       switch (name) {
         // case 'facebook_login': return facebookLogin(args);
         // case 'facebook_logout': return facebookLogout(args);
         // case 'facebook_check_auth': return facebookCheckAuth(args, this.apiKey);
-        case 'facebook_list_ad_accounts': return listAdAccounts(args, this.facebookAccessToken);
-        case 'facebook_fetch_pagination_url': return fetchPaginationUrl(args, this.facebookAccessToken);
-        case 'facebook_get_details_of_ad_account': return getAccountDetails(args, this.facebookAccessToken);
-        case 'facebook_get_adaccount_insights': return getAccountInsights(args, this.facebookAccessToken);
-        case 'facebook_get_activities_by_adaccount': return getAccountActivities(args, this.facebookAccessToken);
-        case 'facebook_get_ad_creatives': return getAdCreatives(args, this.facebookAccessToken);
+        case 'facebook_list_ad_accounts': return listAdAccounts(args, accessToken);
+        case 'facebook_fetch_pagination_url': return fetchPaginationUrl(args, accessToken);
+        case 'facebook_get_details_of_ad_account': return getAccountDetails(args, accessToken);
+        case 'facebook_get_adaccount_insights': return getAccountInsights(args, accessToken);
+        case 'facebook_get_activities_by_adaccount': return getAccountActivities(args, accessToken);
+        case 'facebook_get_ad_creatives': return getAdCreatives(args, accessToken);
         default: throw new Error(`Unknown tool: ${name}`);
       }
     });
@@ -147,12 +97,7 @@ class FacebookAdsMCPServer {
   }
 }
 
-// Read CLI args:
-// Expected usage:
-// node src/index.js "10xer MCP Server" "http://localhost:8000/mcp-api/sse" "your_jwt_api_key"
-const [serverName, sseUrl, apiKey] = process.argv.slice(2);
-
-const server = new FacebookAdsMCPServer({ serverName, sseUrl, apiKey });
+const server = new FacebookAdsMCPServer();
 
 server.run().catch((error) => {
   console.error('Failed to start server:', error);

@@ -25,10 +25,10 @@ export const TOOL_SCHEMAS = {
    "properties": {
       "organization_id": {
         "type": "string",
-        "description": "Organization ID required for this tool"
+        "description": "Optional organization label for older clients"
       }
     },
-    "required": ["organization_id"],
+    "required": [],
     additionalProperties: false,
   },
 
@@ -41,10 +41,10 @@ facebook_fetch_pagination_url: {
       },
       organization_id: {
         type: 'string',
-        description: 'Organization ID of the current user',
+        description: 'Optional organization label for older clients',
       },
     },
-    required: ['url', 'organization_id'],
+    required: ['url'],
     additionalProperties: false,
   },
 
@@ -62,10 +62,10 @@ facebook_fetch_pagination_url: {
       },
       organization_id: {
         type: 'string',
-        description: 'Organization ID of the current user',
+        description: 'Optional organization label for older clients',
       },
     },
-    required: ['act_id', 'organization_id'],
+    required: ['act_id'],
     additionalProperties: false,
   },
 
@@ -134,10 +134,10 @@ facebook_fetch_pagination_url: {
       },
       organization_id: {
         type: 'string',
-        description: 'Organization ID of the current user',
+        description: 'Optional organization label for older clients',
       },
     },
-    required: ['act_id', 'fields', 'organization_id'],
+    required: ['act_id', 'fields'],
     additionalProperties: false,
   },
 
@@ -183,10 +183,10 @@ facebook_fetch_pagination_url: {
       },
       organization_id: {
         type: 'string',
-        description: 'Organization ID of the current user',
+        description: 'Optional organization label for older clients',
       },
     },
-    required: ['act_id', 'organization_id'],
+    required: ['act_id'],
     additionalProperties: false,
   },
 
@@ -207,10 +207,10 @@ facebook_fetch_pagination_url: {
       },
       organization_id: {
         type: 'string',
-        description: 'Organization ID of the current user',
+        description: 'Optional organization label for older clients',
       },
     },
-    required: ['ad_ids', 'organization_id'],
+    required: ['ad_ids'],
     additionalProperties: false,
   },
 
