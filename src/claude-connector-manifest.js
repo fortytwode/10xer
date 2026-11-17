@@ -3,7 +3,7 @@ export const CLAUDE_CONNECTOR_MANIFEST = {
   "description": "Access your Meta Ad Accounts, insights, creatives, and performance data directly in Claude.",
   "version": "1.0.0",
   "connection": {
-    "type": "none"
+    "type": "bearer"
   },
   "api": {
     "base_url": "https://10xer-production.up.railway.app"

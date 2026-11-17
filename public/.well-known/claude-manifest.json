@@ -3,6 +3,7 @@
   "description": "Access your Meta Ad Accounts, insights, creatives, and performance data directly in Claude.",
   "api_url": "https://10xer-web-production.up.railway.app",
   "integration_url": "https://10xer-web-production.up.railway.app/mcp-api/sse",
+  "auth": {"type": "service_http", "authorization_type": "bearer"},
   "version": "1.0.0",
   "tools": [
     {

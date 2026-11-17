@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+const accountId = z.string().regex(/^(?:act_)?[0-9]+$/, 'Expected a Meta ad account ID');
+
 // Validation schemas for tool parameters
 export const ValidationSchemas = {
   paginationUrl: z.object({
@@ -7,12 +9,12 @@ export const ValidationSchemas = {
   }),
 
   accountDetails: z.object({
-    act_id: z.string().min(1, 'act_id is required'),
+    act_id: accountId,
     fields: z.array(z.string()).optional(),
   }),
 
   accountInsights: z.object({
-    act_id: z.string().min(1, 'act_id is required'),
+    act_id: accountId,
     fields: z.array(z.string()).min(1, 'At least one field is required'),
     date_preset: z.string().optional(),
     level: z.string().optional(),
@@ -32,7 +34,7 @@ export const ValidationSchemas = {
   }),
 
   accountActivities: z.object({
-    act_id: z.string().min(1, 'act_id is required'),
+    act_id: accountId,
     fields: z.array(z.string()).optional(),
     since: z.string().optional(),
     until: z.string().optional(),
@@ -46,7 +48,7 @@ export const ValidationSchemas = {
   }),
 
   adCreatives: z.object({
-    ad_ids: z.array(z.string()).min(1).max(50),
+    ad_ids: z.array(z.string().regex(/^[0-9]+$/, 'Expected a Meta ad ID')).min(1).max(50),
     include_images: z.boolean().default(true)
   }),
 

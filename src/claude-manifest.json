@@ -3,24 +3,22 @@
   "name_for_human": "Facebook Ads Universal Server",
   "name_for_model": "facebook_ads_universal",
   "description_for_human": "Access and manage Facebook Ads data through MCP protocol.",
-  "description_for_model": "Server to interface with Facebook Ads APIs via MCP. Requires organization_id.",
+  "description_for_model": "Access Facebook Ads data for the authenticated 10xer account.",
   "auth": {
-    "type": "none"
+    "type": "service_http",
+    "authorization_type": "bearer"
   },
   "api": {
     "type": "mcp",
     "mcp_config": {
       "command": "node",
       "args": [
-        "${__dirname}/src/universal-server.js",
-        "10xer MCP Server",
-        "https://10xer-production.up.railway.app/mcp",
-        "${user_config.organization_id}"
+        "${__dirname}/src/universal-server.js"
       ],
       "env": {
-        "SERVER_NAME": "10xer MCP Server",
-        "SSE_URL": "https://10xer-production.up.railway.app/mcp",
-        "ORGANIZATION_ID": "${user_config.organization_id}"
+        "SERVER_MODE": "mcp",
+        "API_KEY": "${user_config.api_key}",
+        "ACCOUNT_SERVICE_ORIGIN": "${user_config.account_service_origin}"
       }
     }
   },
@@ -28,10 +26,17 @@
   "contact_email": "support@yourdomain.com",
   "legal_info_url": "https://yourdomain.com/legal",
   "user_config": {
-    "organization_id": {
+    "api_key": {
       "type": "string",
-      "title": "Organization ID",
-      "description": "Facebook business organization ID",
+      "title": "10xer MCP API Key",
+      "description": "Enter your API key for the 10xer MCP Server. This enables OAuth authentication with Facebook.",
+      "sensitive": true,
+      "required": true
+    },
+    "account_service_origin": {
+      "type": "string",
+      "title": "Verified 10xer dashboard origin",
+      "description": "Enter the HTTPS origin of the 10xer dashboard where your account key was issued. Confirm it with the deployment owner.",
       "required": true
     }
   },

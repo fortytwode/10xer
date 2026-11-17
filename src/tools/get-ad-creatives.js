@@ -57,7 +57,14 @@ export async function getAdCreatives(args, accessToken) {
       await Promise.all(ads.map(async (ad) => {
         if (ad.creative.image_url) {
           try {
-            const response = await axios.get(ad.creative.image_url, {
+            const image = new URL(ad.creative.image_url);
+            const cdn = ['fbcdn.net', 'fbsbx.com', 'cdninstagram.com'].some(
+              domain => image.hostname === domain || image.hostname.endsWith('.' + domain)
+            );
+            if (image.protocol !== 'https:' || image.username || image.password || image.port || !cdn) return;
+            const response = await axios.get(image.href, {
+              maxRedirects: 0,
+              maxContentLength: 8 * 1024 * 1024,
               responseType: 'arraybuffer',
               timeout: 5000,
               headers: {
@@ -69,7 +76,7 @@ export async function getAdCreatives(args, accessToken) {
             ad.creative.image_data = `data:${mimeType};base64,${base64}`;
             console.error(`✅ Downloaded image for ad ${ad.ad_id}`);
           } catch (error) {
-            console.error(`❌ Failed to download image for ad ${ad.ad_id}: ${error.message}`);
+            console.error(`Could not embed the image for ad ${ad.ad_id}.`);
           }
         }
       }));

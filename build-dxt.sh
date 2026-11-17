@@ -1,41 +1,25 @@
-#!/bin/bash
+#!/usr/bin/env bash
+set -euo pipefail
 
-# Build DXT file for Claude Desktop
-echo "🔨 Building DXT file..."
-
-# Remove old DXT if it exists
-if [ -f "10xer_updated.dxt" ]; then
-    rm 10xer_updated.dxt
-    echo "Removed old DXT file"
-fi
-
-# Create temporary directory
-mkdir -p temp_dxt
-
-# Copy all necessary files (excluding node_modules, .git, etc.)
-echo "📦 Copying source files..."
-rsync -av --exclude='node_modules' \
-          --exclude='.git' \
-          --exclude='*.dxt' \
-          --exclude='temp_dxt' \
-          --exclude='.env' \
-          --exclude='*.log' \
-          --exclude='debug-*.js' \
-          --exclude='manual-test.js' \
-          . temp_dxt/
-
-# Create the DXT (ZIP) file
-echo "🗜️  Creating DXT archive..."
-cd temp_dxt
-zip -r ../10xer_updated.dxt . -x "*.DS_Store"
-cd ..
-
-# Clean up
-rm -rf temp_dxt
-
-echo "✅ DXT file created: 10xer_updated.dxt"
-echo ""
-echo "📋 Next steps:"
-echo "1. Upload 10xer_updated.dxt to Claude Desktop settings"
-echo "2. Restart Claude Desktop"
-echo "3. Test the monthly breakdown functionality"
+cd "$(dirname "$0")"
+project_dir="$PWD"
+stage_dir="$(mktemp -d)"
+trap 'rm -rf "$stage_dir"' EXIT
+cp manifest.json package.json package-lock.json "$stage_dir/"
+cp -R src public "$stage_dir/"
+(cd "$stage_dir" && npm ci --omit=dev --ignore-scripts --no-audit --no-fund)
+# Include only the application and its locked dependencies in the extension.
+(cd "$stage_dir" && zip -qr "$stage_dir/release.zip" manifest.json package.json src public node_modules -x 'node_modules/.bin/*' '*/.DS_Store')
+for bundle in 10xer.dxt 10xer_updated.dxt 10xer_16_10_2025.dxt 10xer_3_10_2025.dxt; do
+  cp "$stage_dir/release.zip" "$project_dir/$bundle"
+done
+# Preserve the original loopback-only backend for the local testing edition.
+(cd "$stage_dir" && node --input-type=commonjs -e '
+  const fs = require("node:fs");
+  const manifest = JSON.parse(fs.readFileSync("manifest.json", "utf8"));
+  manifest.server.mcp_config.env.SSE_URL = "http://localhost:8000/mcp-api/sse";
+  delete manifest.server.mcp_config.env.ACCOUNT_SERVICE_ORIGIN;
+  delete manifest.user_config.account_service_origin;
+  fs.writeFileSync("manifest.json", JSON.stringify(manifest, null, 2));
+' && zip -q "$stage_dir/release.zip" manifest.json)
+cp "$stage_dir/release.zip" "$project_dir/10xer_local_code_testing.dxt"
